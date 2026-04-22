@@ -1,9 +1,9 @@
 import apiClient from './api';
 
 export const authService = {
-  // Hàm Đăng nhập
-  login: async (username?: string, password?: string) => {
-    const response = await apiClient.post('/auth/login', { username, password });
+  // Hàm Đăng nhập: Gọi bằng email hoặc số điện thoại
+  login: async (account: string, password: string) => {
+    const response = await apiClient.post('/auth/login', { account, password });
     return response.data;
   },
 

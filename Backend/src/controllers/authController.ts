@@ -9,8 +9,10 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { username, email, phone, password, display_name } = req.body;
+    const { username, email, phone_number, password, display_name } = req.body;
     console.log("👉 1. Backend nhận được dữ liệu:", req.body);
+
+    
 
     // Kiểm tra trùng lặp Tên đăng nhập
     const existingUsername = await User.findOne({ username });
@@ -31,10 +33,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Kiểm tra trùng Số điện thoại (Nếu có gửi phone lên)
-    if (phone) {
-      const existingPhone = await User.findOne({ phone });
+    if (phone_number) {
+      const existingPhone = await User.findOne({ phone_number });
       if (existingPhone) {
-        console.log("❌ Lỗi: Phone đã tồn tại");
+        console.log("❌ Lỗi: Phone đã tồn tại");  
         res.status(400).json({ message: 'Số điện thoại này đã được đăng ký!' });
         return;
       }
@@ -45,13 +47,22 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const password_hash = await bcrypt.hash(password, salt);
 
     console.log("✅ 3. Chuẩn bị lưu vào Database...");
-    const newUser = new User({
-      username,
-      email: email || undefined,
-      phone: phone || undefined,
-      password_hash,
-      display_name: display_name || username
-    });
+   const newUser = new User({
+  username: username,
+  
+  // Xử lý Email: Nếu là chuỗi rỗng thì BẮT BUỘC gán bằng null để tránh lỗi pattern '@'
+  email: (email && email.trim() !== "") ? email : null,
+  
+  // Xử lý Số điện thoại: Chuỗi rỗng -> null
+  phone_number: (phone_number && phone_number.trim() !== "") ? phone_number : null,
+  
+  password_hash: password_hash,
+  display_name: display_name || username,
+  
+  // 2 Trường bắt buộc theo Schema của Toản:
+  status: 'active', // Hoặc 'pending' tùy logic của bạn
+  created_at: new Date() 
+});
 
     await newUser.save();
     console.log("🎉 4. LƯU THÀNH CÔNG VÀO MONGODB!");
@@ -65,6 +76,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     // Bắt lỗi E11000 Duplicate Key của MongoDB
     if (error.code === 11000) {
       res.status(400).json({ message: 'Hệ thống báo trùng lặp dữ liệu (Lỗi Index)!' });
+    } else if (error.name === 'ValidationError' || (error.message && error.message.includes('LỖI BẢO MẬT'))) {
+      res.status(400).json({ message: error.message });
     } else {
       res.status(500).json({ message: 'Lỗi server không xác định!' });
     }
@@ -116,27 +129,26 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
+    console.log("👉 Dữ liệu Login nhận được:", req.body);
     // Frontend gửi lên trường tên là 'username', nhưng thực chất nó có thể là email hoặc số điện thoại
-    const { username, password } = req.body;
+    const { account , password } = req.body;
 
-    if (!username || !password) {
+    if (!account || !password) {
       res.status(400).json({ message: 'Vui lòng nhập tài khoản và mật khẩu!' });
       return;
     }
 
-    // TÌM KIẾM THÔNG MINH (Dùng toán tử $or của MongoDB)
-    // Backend sẽ quét 1 lượt cả 3 cột xem có khớp cột nào không
+    // TÌM KIẾM: Chỉ dùng email hoặc số điện thoại (không dùng username)
     const user = await User.findOne({
       $or: [
-        { username: username },
-        { email: username },
-        { phone: username }
+        { email: account },
+        { phone_number: account }
       ]
     });
 
-    // Nếu rà soát cả 3 cột mà vẫn không thấy
+    // Nếu không tìm thấy
     if (!user) {
-      res.status(401).json({ message: 'Tài khoản, Email hoặc Số điện thoại không tồn tại!' });
+      res.status(401).json({ message: 'Email hoặc Số điện thoại không tồn tại!' });
       return;
     }
 
@@ -160,7 +172,9 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       user: {
         id: user._id,
         username: user.username,
-        display_name: user.display_name
+        display_name: user.display_name,
+        email: user.email,
+        phone_number: user.phone_number
       }
     });
 

@@ -7,17 +7,19 @@ import { authService } from "../../services/authService";
 
 
 export function LoginView() {
-  const [email, setEmail] = useState("");
+  const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  // 1. Xử lý Đăng nhập thông thường (Email/Password)
+  // 1. Xử lý Đăng nhập thông thường (Email hoặc Số điện thoại + Password)
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
     try {
-      const data = await authService.login(email, password);
-      
+      const data = await authService.login(account, password);
+
       // Lưu cả Token và thông tin User
       localStorage.setItem('userToken', data.token);
       localStorage.setItem('userData', JSON.stringify(data.user));
@@ -25,7 +27,7 @@ export function LoginView() {
       console.log("🎉 Đăng nhập thành công!");
       navigate('/'); 
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Sai tài khoản hoặc mật khẩu!');
+      setError(error.response?.data?.message || 'Email/Số điện thoại hoặc mật khẩu không chính xác!');
     }
   };
 
@@ -74,18 +76,25 @@ export function LoginView() {
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
-            {/* Input Email */}
+            {/* Thông báo lỗi */}
+            {error && (
+              <div className="p-3 bg-red-50 text-red-600 text-sm rounded-xl border border-red-100">
+                {error}
+              </div>
+            )}
+
+            {/* Input Email hoặc Số điện thoại */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email hoặc số điện thoại</label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
-                  type="email"
+                  type="text"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={account}
+                  onChange={(e) => setAccount(e.target.value)}
                   className="w-full pl-12 pr-4 py-3 bg-white/50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all"
-                  placeholder="Nhập email của bạn"
+                  placeholder="Nhập email hoặc số điện thoại"
                 />
               </div>
             </div>

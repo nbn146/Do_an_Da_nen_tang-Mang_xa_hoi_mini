@@ -36,5 +36,11 @@ const userSchema: Schema = new Schema({
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
     collection: 'users'
 });
-
+// KIỂM TRA LOGIC "1 TRONG 2" TRƯỚC KHI LƯU
+userSchema.pre('validate', function(this: any) {
+  // 'this' đại diện cho user đang chuẩn bị được lưu
+  if (!this.email && !this.phone_number) {
+    throw new Error('LỖI BẢO MẬT: Phải cung cấp ít nhất email hoặc phone_number');
+  }
+});
 export default mongoose.model<IUser>('User', userSchema);

@@ -41,14 +41,9 @@ export function RegisterView() {
         display_name: displayName,
         username: username,
         password: password,
+        email: isEmail ? contact : null,
+        phone_number: isPhone ? contact : null
       };
-
-      // Tự động gán đúng trường dữ liệu
-      if (isEmail) {
-        userData.email = contact;
-      } else if (isPhone) {
-        userData.phone = contact; 
-      }
 
       // 4. Gọi API Backend
       console.log("Chuẩn bị gửi dữ liệu này đi:", userData);
@@ -137,7 +132,7 @@ export function RegisterView() {
             </div>
 
           
-              <div>
+    <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu</label>
       <div className="relative">
         <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -159,14 +154,14 @@ export function RegisterView() {
       </div>
     </div>
 
-              <div>
+      <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">Nhập lại mật khẩu</label>
       <div className="relative">
         <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
         <input
           type={showPassword ? "text" : "password"} // Thay đổi type dựa trên state
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
           className="w-full pl-12 pr-12 py-3 bg-white/50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
           placeholder="Nhập lại mật khẩu"
         />

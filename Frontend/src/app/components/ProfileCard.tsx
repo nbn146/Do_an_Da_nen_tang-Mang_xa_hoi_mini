@@ -1,6 +1,20 @@
-import { MapPin, Calendar, Link as LinkIcon } from "lucide-react";
+import { MapPin, Calendar, Link as LinkIcon, Mail, Phone } from "lucide-react";
+import { useState, useEffect } from "react";
 
 export function ProfileCard() {
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const userData = localStorage.getItem('userData');
+    if (userData) {
+      try {
+        setUser(JSON.parse(userData));
+      } catch (e) {
+        console.error("Lỗi parse userData", e);
+      }
+    }
+  }, []);
+
   return (
     <div className="sticky top-20">
       <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-gray-200/50 overflow-hidden">
@@ -15,8 +29,8 @@ export function ProfileCard() {
               alt="Profile"
               className="w-24 h-24 rounded-full object-cover ring-4 ring-white shadow-lg"
             />
-            <h2 className="mt-3 font-bold text-gray-900">Nguyễn Văn A</h2>
-            <p className="text-sm text-gray-500">@nguyenvana</p>
+            <h2 className="mt-3 font-bold text-gray-900">{user?.display_name || "Nguyễn Văn A"}</h2>
+            <p className="text-sm text-gray-500">@{user?.username || "nguyenvana"}</p>
           </div>
           
           {/* Bio */}
@@ -30,13 +44,24 @@ export function ProfileCard() {
               <MapPin className="w-4 h-4" />
               <span>Hà Nội, Việt Nam</span>
             </div>
+            
+            {user?.email && (
+              <div className="flex items-center space-x-2">
+                <Mail className="w-4 h-4" />
+                <span>{user.email}</span>
+              </div>
+            )}
+            
+            {user?.phone_number && (
+              <div className="flex items-center space-x-2">
+                <Phone className="w-4 h-4" />
+                <span>{user.phone_number}</span>
+              </div>
+            )}
+
             <div className="flex items-center space-x-2">
               <Calendar className="w-4 h-4" />
               <span>Tham gia tháng 3, 2024</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <LinkIcon className="w-4 h-4" />
-              <a href="#" className="text-blue-600 hover:underline">portfolio.com</a>
             </div>
           </div>
           
