@@ -24,15 +24,17 @@ export function LoginView() {
       localStorage.setItem('userToken', data.token);
       localStorage.setItem('userData', JSON.stringify(data.user));
       
-      console.log("🎉 Đăng nhập thành công!");
+      console.log("🎉 Đăng nhập thành công!", data.user.display_name);
       navigate('/'); 
     } catch (error: any) {
-      setError(error.response?.data?.message || 'Email/Số điện thoại hoặc mật khẩu không chính xác!');
+      const serverMessage = error.response?.data?.message || 'Lỗi kết nối se  rver!';
+      setError(serverMessage);
     }
   };
 
   // 2. Xử lý Đăng nhập Google (Gộp 2 hàm cũ thành 1 cho gọn)
   const handleGoogleSuccess = async (credentialResponse: any) => {
+    console.log("idToken:", credentialResponse.credential);
     try {
       const idToken = credentialResponse.credential;
       
