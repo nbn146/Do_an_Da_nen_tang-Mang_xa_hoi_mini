@@ -13,9 +13,15 @@ const MONGO_URI = process.env.DATABASE_URL;
 
 
 app.use(cors({
-  origin: "http://localhost:5173",
+  origin: function (origin, callback) {
+    if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
-}))
+}));
 
 // Middleware phải được setup trước các routes
 app.use(express.json());

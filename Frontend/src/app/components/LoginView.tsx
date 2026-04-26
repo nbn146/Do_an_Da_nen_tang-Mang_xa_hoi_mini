@@ -27,7 +27,7 @@ export function LoginView() {
       console.log("🎉 Đăng nhập thành công!", data.user.display_name);
       navigate('/'); 
     } catch (error: any) {
-      const serverMessage = error.response?.data?.message || 'Lỗi kết nối se  rver!';
+      const serverMessage = error.response?.data?.message || 'Lỗi kết nối server!';
       setError(serverMessage);
     }
   };
