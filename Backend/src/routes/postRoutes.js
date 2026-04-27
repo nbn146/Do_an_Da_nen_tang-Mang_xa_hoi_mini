@@ -4,7 +4,7 @@ import {
   commentPost,
   createPost,
   getNewsfeed,
-  likePost,
+  reactToPost,
 } from "../controllers/postController.js";
 import { protect } from "../middleware/auth.js";
 
@@ -13,7 +13,7 @@ const router = Router();
 
 router.get("/newsfeed", protect, getNewsfeed);
 router.post("/", protect, upload.single("image"), createPost);
-router.post("/:postId/like", protect, likePost);
+router.post("/:postId/react", protect, reactToPost);
 router.post("/:postId/comment", protect, commentPost);
 
 export default router;
