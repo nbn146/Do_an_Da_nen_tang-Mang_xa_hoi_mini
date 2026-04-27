@@ -53,8 +53,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     const newUser = new User({
       username,
-      email: email?.trim() || null,
-      phone_number: phone_number?.trim() || null,
+      email: email?.trim() || undefined,
+      phone_number: phone_number?.trim() || undefined,
       password_hash,
       display_name: display_name || username,
       status: "active",

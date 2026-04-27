@@ -3,6 +3,7 @@ import { Eye, EyeOff, Mail, Lock, User, ArrowRight, AtSign } from "lucide-react"
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "motion/react";
 import { authService } from "../../services/authService";
+import { useTranslation } from "react-i18next";
 
 export function RegisterView() {
   const [displayName, setDisplayName] = useState("");
@@ -13,13 +14,14 @@ export function RegisterView() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+   const { t } = useTranslation();
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // 1. Kiểm tra mật khẩu khớp nhau
     if (password !== confirmPassword) {
-      setError("Mật khẩu nhập lại không khớp!");
+      setError(t("auth.PASSWORD_MISMATCH"));
       return;
     }
 
@@ -29,7 +31,7 @@ export function RegisterView() {
     const isPhone = /(84|0[3|5|7|8|9])+([0-9]{8})\b/.test(contact); 
 
     if (!isEmail && !isPhone) {
-      setError("Định dạng Email hoặc Số điện thoại không hợp lệ!");
+      setError(t("auth.INVALID_CONTACT_FORMAT"));
       return;
     }
 

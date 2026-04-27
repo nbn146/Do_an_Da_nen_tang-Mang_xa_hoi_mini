@@ -7,18 +7,24 @@ import authRoutes from "./routes/authRoutes.js"; // Import Route vừa tạo
 import * as middleware from "i18next-http-middleware";
 import i18next from "./config/i18n.js";
 
+
 dotenv.config(); // Đọc file .env
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const MONGO_URI = process.env.MONGO_URI;
+const MONGO_URI = process.env.DATABASE_URL || process.env.MONGO_URI;
 
-app.use(
-  cors({
-    origin: "http://localhost:5173",
-    credentials: true,
-  }),
-);
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
 
 // Middleware phải được setup trước các routes
 app.use(express.json());
