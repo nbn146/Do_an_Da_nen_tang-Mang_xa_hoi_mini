@@ -1,0 +1,73 @@
+{
+  "common": {
+    "SUCCESS": "Thành công!",
+    "SERVER_ERROR": "Lỗi máy chủ nội bộ, vui lòng thử lại!",
+    "NOT_FOUND": "Không tìm thấy tài nguyên!",
+    "UNAUTHORIZED": "Bạn không có quyền thực hiện hành động này!",
+    "FORBIDDEN": "Truy cập bị từ chối!",
+    "MISSING_PARAMS": "Thiếu tham số bắt buộc!"
+  },
+  "auth": {
+    "REGISTER_SUCCESS": "Đăng ký tài khoản thành công!",
+    "LOGIN_SUCCESS": "Đăng nhập thành công!",
+    "GOOGLE_LOGIN_SUCCESS": "Đăng nhập bằng Google thành công!",
+    "DUPLICATE_USERNAME": "Tên người dùng đã tồn tại!",
+    "DUPLICATE_EMAIL": "Email này đã được đăng ký!",
+    "DUPLICATE_PHONE": "Số điện thoại này đã được đăng ký!",
+    "DUPLICATE_KEY": "Dữ liệu bị trùng lặp!",
+    "VALIDATION_ERROR": "Dữ liệu không hợp lệ!",
+    "MISSING_CREDENTIALS": "Vui lòng nhập tài khoản và mật khẩu!",
+    "USER_NOT_FOUND": "Không tìm thấy email hoặc số điện thoại!",
+    "INVALID_PASSWORD": "Mật khẩu không đúng!",
+    "MISSING_ID_TOKEN": "Thiếu Google ID Token!",
+    "GOOGLE_TOKEN_INVALID": "Xác thực Google token thất bại!",
+    "GOOGLE_PAYLOAD_MISSING": "Không thể lấy thông tin từ tài khoản Google!",
+    "SERVER_CONFIG_ERROR": "Cấu hình máy chủ không chính xác!"
+  },
+  "chat": {
+    "CONVERSATION_CREATED": "Tạo cuộc trò chuyện thành công!",
+    "CONVERSATION_EXISTS": "Cuộc trò chuyện đã tồn tại!",
+    "CONVERSATION_NOT_FOUND": "Không tìm thấy cuộc trò chuyện!",
+    "CONVERSATIONS_FETCHED": "Lấy danh sách cuộc trò chuyện thành công!",
+    "MISSING_FIELDS": "Thiếu trường bắt buộc!",
+    "INVALID_PARTICIPANTS": "Chat riêng phải có đúng 2 người tham gia!",
+    "MISSING_GROUP_NAME": "Chat nhóm phải có tên!",
+    "MESSAGES_FETCHED": "Lấy tin nhắn thành công!",
+    "MESSAGE_SENT": "Gửi tin nhắn thành công!",
+    "MESSAGE_DELETED": "Xóa tin nhắn thành công!",
+    "MESSAGE_NOT_FOUND": "Không tìm thấy tin nhắn!",
+    "MISSING_CONTENT": "Nội dung tin nhắn không được để trống!",
+    "MARKED_AS_READ": "Đã đánh dấu là đã đọc!",
+    "REACTION_UPDATED": "Cập nhật phản ứng thành công!",
+    "MISSING_EMOJI": "Thiếu emoji!"
+  },
+  "post": {
+    "CREATED": "Tạo bài viết thành công!",
+    "UPDATED": "Cập nhật bài viết thành công!",
+    "DELETED": "Xóa bài viết thành công!",
+    "NOT_FOUND": "Không tìm thấy bài viết!",
+    "FETCHED": "Lấy danh sách bài viết thành công!",
+    "MISSING_CONTENT": "Nội dung bài viết không được để trống!",
+    "NOT_AUTHOR": "Bạn không có quyền chỉnh sửa bài viết này!"
+  },
+  "interaction": {
+    "COMMENT_ADDED": "Thêm bình luận thành công!",
+    "COMMENT_DELETED": "Xóa bình luận thành công!",
+    "COMMENT_NOT_FOUND": "Không tìm thấy bình luận!",
+    "POST_LIKED": "Đã thích bài viết!",
+    "POST_UNLIKED": "Đã bỏ thích bài viết!"
+  },
+  "user": {
+    "PROFILE_UPDATED": "Cập nhật hồ sơ thành công!",
+    "FETCHED": "Lấy thông tin người dùng thành công!",
+    "NOT_FOUND": "Không tìm thấy người dùng!",
+    "AVATAR_UPDATED": "Cập nhật ảnh đại diện thành công!"
+  },
+  "upload": {
+    "SUCCESS": "Tải tệp lên thành công!",
+    "FAILED": "Tải tệp lên thất bại!",
+    "INVALID_FORMAT": "Định dạng tệp không hợp lệ! Vui lòng tải lên ảnh (JPG, PNG, WEBP).",
+    "FILE_TOO_LARGE": "Tệp quá lớn! Kích thước tối đa cho phép là 5MB.",
+    "MISSING_FILE": "Vui lòng chọn tệp để tải lên!"
+  }
+}

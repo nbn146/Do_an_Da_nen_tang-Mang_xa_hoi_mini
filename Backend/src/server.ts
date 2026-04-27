@@ -4,6 +4,8 @@ import mongoose from "mongoose";
 import cors from "cors";
 import dotenv from "dotenv";
 import authRoutes from "./routes/authRoutes.js"; // Import Route vừa tạo
+import * as middleware from "i18next-http-middleware";
+import i18next from "./config/i18n.js";
 
 dotenv.config(); // Đọc file .env
 
@@ -23,7 +25,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // GẮN CÁC ĐƯỜNG DẪN API VÀO ĐÂY
+
+app.use(middleware.handle(i18next));
+
 app.use("/api/auth", authRoutes);
+
+
 
 app.get("/api/test", (req: Request, res: Response) => {
   res.status(200).json({ message: "MiniSocial API đang chạy mượt mà! 🚀" });

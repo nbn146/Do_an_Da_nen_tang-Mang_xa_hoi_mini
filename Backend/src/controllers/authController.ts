@@ -17,14 +17,19 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     const existingUsername = await User.findOne({ username });
     if (existingUsername) {
-      errorResponse(res, "Tên đăng nhập đã tồn tại", 400, "DUPLICATE_USERNAME");
+      errorResponse(req, res, "auth.DUPLICATE_USERNAME", 400, "DUPLICATE_USERNAME");
       return;
     }
+    //   req: Request,       // 👈 Bổ sung req vào đây
+    //   res: Response,
+    //   messageKey = "common.SERVER_ERROR", // 👈 Nhận key từ file JSON
+    //   status = 500,
+    //   error = "SERVER_ERROR", // Mã lỗi nguyên bản (giữ nguyên để debug)
 
     if (email?.trim()) {
       const existingEmail = await User.findOne({ email });
       if (existingEmail) {
-        errorResponse(res, "Email này đã tồn tại!", 400, "DUPLICATE_EMAIL");
+        errorResponse(req, res, "auth.DUPLICATE_EMAIL", 400, "DUPLICATE_EMAIL");
         return;
       }
     }
@@ -33,8 +38,9 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       const existingPhone = await User.findOne({ phone_number });
       if (existingPhone) {
         errorResponse(
+          req,
           res,
-          "Số điện thoại này đã tồn tại!",
+          "auth.DUPLICATE_PHONE",
           400,
           "DUPLICATE_PHONE",
         );
@@ -57,23 +63,25 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     await newUser.save();
 
-    successResponse(res, null, "Đăng ký tài khoản thành công!", 201);
+    successResponse(req, res, null, "auth.REGISTER_SUCCESS", 201);
   } catch (error: any) {
     console.error("Error:", error);
 
     if (error.code === 11000) {
       errorResponse(
+        req,
         res,
-        "Dữ liệu đã tồn tại trong hệ thống!",
+        "auth.DUPLICATE_KEY",
         400,
         "DUPLICATE_KEY",
       );
     } else if (error.name === "ValidationError") {
-      errorResponse(res, error.message, 400, "VALIDATION_ERROR");
+      errorResponse(req, res, "auth.VALIDATION_ERROR", 400, "VALIDATION_ERROR");
     } else {
       errorResponse(
+        req,
         res,
-        "Lỗi server, vui lòng thử lại sau!",
+        "auth.SERVER_ERROR",
         500,
         "SERVER_ERROR",
       );
@@ -90,8 +98,9 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     if (!account || !password) {
       errorResponse(
+        req,
         res,
-        "Vui lòng nhập tài khoản và mật khẩu!",
+        "auth.MISSING_CREDENTIALS",
         400,
         "MISSING_CREDENTIALS",
       );
@@ -104,8 +113,9 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     if (!user) {
       errorResponse(
+        req,
         res,
-        "Email hoặc số điện thoại không tồn tại!",
+        "auth.USER_NOT_FOUND",
         401,
         "USER_NOT_FOUND",
       );
@@ -115,8 +125,9 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       errorResponse(
+        req,
         res,
-        "Tên đăng nhập hoặc mật khẩu không chính xác!",
+        "auth.INVALID_PASSWORD",
         401,
         "INVALID_PASSWORD",
       );
@@ -128,6 +139,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     });
 
     successResponse(
+      req,
       res,
       {
         token,
@@ -140,13 +152,16 @@ export const login = async (req: Request, res: Response): Promise<void> => {
           avatar_url: user.avatar_url,
         },
       },
-      "Đăng nhập thành công!",
+      "auth.LOGIN_SUCCESS",
+      200,
+      "LOGIN_SUCCESS",
     );
   } catch (error) {
     console.error("Error:", error);
     errorResponse(
+      req,
       res,
-      "Lỗi server, vui lòng thử lại sau!",
+      "auth.SERVER_ERROR",
       500,
       "SERVER_ERROR",
     );
@@ -164,7 +179,7 @@ export const googleLogin = async (
     const { idToken } = req.body;
 
     if (!idToken) {
-      errorResponse(res, "Thiếu Google ID Token!", 400, "MISSING_ID_TOKEN");
+      errorResponse(req, res, "auth.MISSING_ID_TOKEN", 400, "MISSING_ID_TOKEN");
       return;
     }
 
@@ -172,8 +187,9 @@ export const googleLogin = async (
     if (!clientId) {
       console.error("GOOGLE_CLIENT_ID chưa được cấu hình");
       errorResponse(
+        req,
         res,
-        "Server chưa cấu hình Google Client ID!",
+        "auth.SERVER_CONFIG_ERROR",
         500,
         "SERVER_CONFIG_ERROR",
       );
@@ -186,8 +202,9 @@ export const googleLogin = async (
     } catch (verifyError: any) {
       console.error("Token verification failed:", verifyError?.message);
       errorResponse(
+        req,
         res,
-        "Xác minh token Google thất bại!",
+        "auth.GOOGLE_TOKEN_INVALID",
         401,
         "GOOGLE_TOKEN_INVALID",
       );
@@ -197,8 +214,9 @@ export const googleLogin = async (
     const payload = ticket.getPayload();
     if (!payload?.email) {
       errorResponse(
+        req,
         res,
-        "Không lấy được thông tin từ tài khoản Google!",
+        "auth.GOOGLE_PAYLOAD_MISSING",
         400,
         "GOOGLE_PAYLOAD_MISSING",
       );
@@ -234,6 +252,7 @@ export const googleLogin = async (
     });
 
     successResponse(
+      req,
       res,
       {
         token,
@@ -245,13 +264,16 @@ export const googleLogin = async (
           avatar_url: user.avatar_url,
         },
       },
-      "Đăng nhập bằng Google thành công!",
+      "auth.GOOGLE_LOGIN_SUCCESS",
+      200,
+      "GOOGLE_LOGIN_SUCCESS",
     );
   } catch (error: any) {
     console.error("Error:", error?.message || error);
     errorResponse(
+      req,
       res,
-      "Lỗi xác thực với Google, vui lòng thử lại!",
+      "auth.SERVER_ERROR",
       500,
       "SERVER_ERROR",
     );

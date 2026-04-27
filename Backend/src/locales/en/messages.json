@@ -1,0 +1,73 @@
+{
+  "common": {
+    "SUCCESS": "Success!",
+    "SERVER_ERROR": "Internal server error, please try again!",
+    "NOT_FOUND": "Resource not found!",
+    "UNAUTHORIZED": "You are not authorized to perform this action!",
+    "FORBIDDEN": "Access denied!",
+    "MISSING_PARAMS": "Missing required parameters!"
+  },
+  "auth": {
+    "REGISTER_SUCCESS": "Account registered successfully!",
+    "LOGIN_SUCCESS": "Logged in successfully!",
+    "GOOGLE_LOGIN_SUCCESS": "Logged in with Google successfully!",
+    "DUPLICATE_USERNAME": "This username is already taken!",
+    "DUPLICATE_EMAIL": "This email is already registered!",
+    "DUPLICATE_PHONE": "This phone number is already registered!",
+    "DUPLICATE_KEY": "Duplicate data detected!",
+    "VALIDATION_ERROR": "Invalid data!",
+    "MISSING_CREDENTIALS": "Please enter your account and password!",
+    "USER_NOT_FOUND": "Email or phone number not found!",
+    "INVALID_PASSWORD": "Incorrect password!",
+    "MISSING_ID_TOKEN": "Missing Google ID Token!",
+    "GOOGLE_TOKEN_INVALID": "Google token verification failed!",
+    "GOOGLE_PAYLOAD_MISSING": "Could not retrieve information from Google account!",
+    "SERVER_CONFIG_ERROR": "Server is not configured correctly!"
+  },
+  "chat": {
+    "CONVERSATION_CREATED": "Conversation created successfully!",
+    "CONVERSATION_EXISTS": "Conversation already exists!",
+    "CONVERSATION_NOT_FOUND": "Conversation not found!",
+    "CONVERSATIONS_FETCHED": "Conversations fetched successfully!",
+    "MISSING_FIELDS": "Missing required fields!",
+    "INVALID_PARTICIPANTS": "Direct chat must have exactly 2 participants!",
+    "MISSING_GROUP_NAME": "Group chat must have a name!",
+    "MESSAGES_FETCHED": "Messages fetched successfully!",
+    "MESSAGE_SENT": "Message sent successfully!",
+    "MESSAGE_DELETED": "Message deleted successfully!",
+    "MESSAGE_NOT_FOUND": "Message not found!",
+    "MISSING_CONTENT": "Message content cannot be empty!",
+    "MARKED_AS_READ": "Marked as read successfully!",
+    "REACTION_UPDATED": "Reaction updated successfully!",
+    "MISSING_EMOJI": "Missing emoji!"
+  },
+  "post": {
+    "CREATED": "Post created successfully!",
+    "UPDATED": "Post updated successfully!",
+    "DELETED": "Post deleted successfully!",
+    "NOT_FOUND": "Post not found!",
+    "FETCHED": "Posts fetched successfully!",
+    "MISSING_CONTENT": "Post content cannot be empty!",
+    "NOT_AUTHOR": "You do not have permission to edit this post!"
+  },
+  "interaction": {
+    "COMMENT_ADDED": "Comment added successfully!",
+    "COMMENT_DELETED": "Comment deleted successfully!",
+    "COMMENT_NOT_FOUND": "Comment not found!",
+    "POST_LIKED": "Post liked!",
+    "POST_UNLIKED": "Post unliked!"
+  },
+  "user": {
+    "PROFILE_UPDATED": "Profile updated successfully!",
+    "FETCHED": "User information fetched successfully!",
+    "NOT_FOUND": "User not found!",
+    "AVATAR_UPDATED": "Avatar updated successfully!"
+  },
+  "upload": {
+    "SUCCESS": "File uploaded successfully!",
+    "FAILED": "File upload failed!",
+    "INVALID_FORMAT": "Invalid file format! Please upload an image (JPG, PNG, WEBP).",
+    "FILE_TOO_LARGE": "File is too large! Maximum allowed size is 5MB.",
+    "MISSING_FILE": "Please select a file to upload!"
+  }
+}
