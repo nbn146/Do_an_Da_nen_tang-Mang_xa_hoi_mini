@@ -53,36 +53,59 @@ export async function getNewsfeed(req, res) {
   return res.json(merged);
 }
 
-export async function likePost(req, res) {
+export async function reactToPost(req, res) {
   const { postId } = req.params;
+  const { type = "like" } = req.body; // type: like, love, haha, wow, sad, angry
+  const validTypes = ["like", "love", "haha", "wow", "sad", "angry"];
+
+  if (!validTypes.includes(type)) {
+    return res.status(400).json({ message: "Invalid reaction type" });
+  }
+
   const post = await Post.findById(postId);
   if (!post) return res.status(404).json({ message: "Post not found" });
 
-  const alreadyLiked = post.likes.some(
-    (id) => String(id) === String(req.userId),
+  const existingReactionIndex = post.reactions.findIndex(
+    (r) => String(r.user) === String(req.userId),
   );
 
-  if (alreadyLiked) {
-    post.likes = post.likes.filter((id) => String(id) !== String(req.userId));
+  let action = ""; // "added", "updated", or "removed"
+
+  if (existingReactionIndex !== -1) {
+
+    if (post.reactions[existingReactionIndex].type === type) {
+
+      post.reactions.splice(existingReactionIndex, 1);
+      action = "removed";
+    } else {
+
+      post.reactions[existingReactionIndex].type = type;
+      action = "updated";
+    }
   } else {
-    post.likes.push(req.userId);
+
+    post.reactions.push({ user: req.userId, type });
+    action = "added";
 
     if (String(post.author) !== String(req.userId)) {
       const notification = await Notification.create({
         recipient: post.author,
         actor: req.userId,
         post: post._id,
-        type: "like",
-        message: "Someone liked your post",
+        type: "reaction",
+        message: `Someone reacted with ${type} to your post`,
       });
       emitNotification(post.author, notification);
     }
   }
 
   await post.save();
-  return res.json({ likesCount: post.likes.length, liked: !alreadyLiked });
+  return res.json({
+    reactionsCount: post.reactions.length,
+    reactions: post.reactions,
+    action
+  });
 }
-
 export async function commentPost(req, res) {
   const { postId } = req.params;
   const { text } = req.body;
