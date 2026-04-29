@@ -105,10 +105,10 @@ export const sendPhoneOtp = async (req: Request, res: Response): Promise<void> =
     await otpModels.deleteMany({phone_number}); // Xóa OTP cũ nếu tồn tại
     await otpModels.create({phone_number, otp, expires_at});
 
-    console.log(`\n=========================================`);
+  
     console.log(`[MOCK SMS] Gửi tới SĐT: ${phone_number}`);
     console.log(`[MOCK SMS] Nội dung: Mã xác nhận Mạng Xã Hội của bạn là: ${otp}. Mã có hiệu lực trong 3 phút.`);
-    console.log(`=========================================\n`);
+  
 
     successResponse(req, res, null, "auth.OTP_SENT", 200, "OTP_SENT");
 
@@ -124,6 +124,52 @@ export const sendPhoneOtp = async (req: Request, res: Response): Promise<void> =
     );
   }
 }
+
+//QUÊN MẬT KHẨU
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { phone_number, otp, newPassword } = req.body;
+
+    // 1. TÌM VÀ SO SÁNH OTP (Logic này giống hệt lúc Đăng ký)
+    const otpRecord = await otpModels.findOne({ phone_number, otp });
+
+    if (!otpRecord) {
+      errorResponse(req, res, "auth.INVALID_OTP", 400, "INVALID_OTP");
+      return;
+    }
+
+    if (otpRecord.expires_at.getTime() < Date.now()) {
+      errorResponse(req, res, "auth.EXPIRED_OTP", 400, "EXPIRED_OTP");
+      return;
+    }
+
+    // 2. NẾU OTP ĐÚNG -> TIẾN HÀNH ĐỔI MẬT KHẨU
+    // Tìm user bằng số điện thoại
+    const user = await User.findOne({ phone_number });
+    if (!user) {
+      errorResponse(req, res, "auth.USER_NOT_FOUND", 404, "USER_NOT_FOUND");
+      return;
+    }
+
+    // Mã hóa mật khẩu mới
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Cập nhật vào Database
+    user.password_hash = hashedPassword;
+    await user.save();
+
+    // Xóa OTP cũ cho sạch DB
+    await otpModels.deleteMany({ phone_number });
+
+    successResponse(req, res, null, "auth.PASSWORD_RESET_SUCCESS", 200, "PASSWORD_RESET_SUCCESS");
+
+  } catch (error: any) {
+    console.error("Error:", error);
+    errorResponse(req, res, "common.SERVER_ERROR", 500, "SERVER_ERROR");
+  }
+};
+
 //XAC THUC OTP
 export const verifyPhoneOtp = async (req: Request, res: Response): Promise<void> => {
   try{

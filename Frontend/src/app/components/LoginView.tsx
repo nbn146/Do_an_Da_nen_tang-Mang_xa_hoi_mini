@@ -103,9 +103,16 @@ export function LoginView() {
 
             {/* Input Mật khẩu */}
             <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">Mật khẩu</label>
+              <div className="flex item-center justify-between mb-2">
+      <label className="text-sm font-medium text-gray-700">Mật khẩu</label>
+      <Link to="/forgot-password" className="text-sm font-semibold text-purple-600 hover:text-purple-700 transition-colors">
+              Quên mật khẩu
+            </Link>
+      
+      </div>
       <div className="relative">
         <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        
         <input
           type={showPassword ? "text" : "password"} // Thay đổi type dựa trên state
           value={password}

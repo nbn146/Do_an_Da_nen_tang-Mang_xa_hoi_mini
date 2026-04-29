@@ -12,6 +12,7 @@ import { Routes, Route } from 'react-router-dom';
 import { LoginView } from './components/LoginView';
 import { RegisterView } from './components/RegisterView';
 import { SocialMediaApp} from './components/SocialMediaApp';
+import { ForgotPassword } from './components/ForgotPassword';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
       <Route path="/" element={<SocialMediaApp />} />
       <Route path="/login" element={<LoginView />} />
       <Route path="/register" element={<RegisterView />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
     </Routes>
   );
 }

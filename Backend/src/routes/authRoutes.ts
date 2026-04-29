@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { register, login, googleLogin ,sendPhoneOtp, verifyPhoneOtp} from '../controllers/authController.js';
+import { register, login, googleLogin ,sendPhoneOtp, verifyPhoneOtp, resetPassword} from '../controllers/authController.js';
 
 
 const router = Router();
@@ -15,4 +15,7 @@ router.post('/google', googleLogin);
 //Router OTP
 router.post('/sendPhoneOtp', sendPhoneOtp);
 router.post('/verifyPhoneOtp', verifyPhoneOtp);
+
+//rOUTER RESET PW
+router.post('/resetPassword', resetPassword);
 export default router;
