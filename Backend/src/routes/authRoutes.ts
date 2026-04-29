@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { register, login, googleLogin } from '../controllers/authController.js';
+import { register, login, googleLogin ,sendPhoneOtp, verifyPhoneOtp} from '../controllers/authController.js';
+
 
 const router = Router();
 
@@ -10,4 +11,8 @@ router.post('/register', register);
 router.post('/login', login);
 // Route Đăng nhập với Google: POST /api/auth/google
 router.post('/google', googleLogin);
+
+//Router OTP
+router.post('/sendPhoneOtp', sendPhoneOtp);
+router.post('/verifyPhoneOtp', verifyPhoneOtp);
 export default router;

@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
 import User from "../models/User.js";
 import { successResponse, errorResponse } from "../utils/response.js";
+import otpModels from "../models/otpModels.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_key";
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -88,6 +89,70 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     }
   }
 };
+
+// OTP
+const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
+export const sendPhoneOtp = async (req: Request, res: Response): Promise<void> => {
+  try{
+    const { phone_number } = req.body;
+    if(!phone_number){
+      errorResponse(req, res, "auth.MISSING_PHONE_NUMBER", 400, "MISSING_PHONE_NUMBER");
+      return;
+    }
+    const otp = generateOtp();
+    const expires_at = new Date(Date.now() + 5 * 60 * 1000); // OTP có hiệu lực trong 5 phút
+
+    await otpModels.deleteMany({phone_number}); // Xóa OTP cũ nếu tồn tại
+    await otpModels.create({phone_number, otp, expires_at});
+
+    console.log(`\n=========================================`);
+    console.log(`[MOCK SMS] Gửi tới SĐT: ${phone_number}`);
+    console.log(`[MOCK SMS] Nội dung: Mã xác nhận Mạng Xã Hội của bạn là: ${otp}. Mã có hiệu lực trong 3 phút.`);
+    console.log(`=========================================\n`);
+
+    successResponse(req, res, null, "auth.OTP_SENT", 200, "OTP_SENT");
+
+  }
+  catch(error: any){
+    console.error("Error:", error);
+    errorResponse(
+      req,
+      res,
+      "common.SERVER_ERROR",
+      500,
+      "SERVER_ERROR",
+    );
+  }
+}
+//XAC THUC OTP
+export const verifyPhoneOtp = async (req: Request, res: Response): Promise<void> => {
+  try{
+    const { phone_number, otp } = req.body;
+    const otpRecord =   await otpModels.findOne({phone_number, otp});
+
+    if(!otpRecord){
+      errorResponse(req, res, "auth.INVALID_OTP", 400, "INVALID_OTP");
+      return;
+    }
+    if (otpRecord.expires_at.getTime() < Date.now()) {
+      errorResponse(req, res, "auth.EXPIRED_OTP", 400, "EXPIRED_OTP");
+      return;
+    }
+    await otpModels.deleteMany({phone_number}); // Xóa OTP sau khi xác thực thành công
+    successResponse(req, res, null, "auth.OTP_VERIFIED", 200, "OTP_VERIFIED");
+  }
+  catch(error: any){
+    console.error("Error:", error);
+    errorResponse(
+      req,
+      res,
+      "common.SERVER_ERROR",
+      500,
+      "SERVER_ERROR",
+    );
+  }
+ 
+}
 
 // ─────────────────────────────────────────────
 // [POST] /api/auth/login

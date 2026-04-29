@@ -22,7 +22,11 @@
     "MISSING_ID_TOKEN": "Thiếu Google ID Token!",
     "GOOGLE_TOKEN_INVALID": "Xác thực Google token thất bại!",
     "GOOGLE_PAYLOAD_MISSING": "Không thể lấy thông tin từ tài khoản Google!",
-    "SERVER_CONFIG_ERROR": "Cấu hình máy chủ không chính xác!"
+    "SERVER_CONFIG_ERROR": "Cấu hình máy chủ không chính xác!",
+    "OTP_SENT": "Mã OTP đã được gửi!",
+    "OTP_VERIFIED": "Xác thực OTP thành công!",
+    "INVALID_OTP": "Mã OTP không hợp lệ!",
+    "EXPIRED_OTP": "Mã OTP đã hết hạn!"
   },
   "chat": {
     "CONVERSATION_CREATED": "Tạo cuộc trò chuyện thành công!",

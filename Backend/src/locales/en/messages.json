@@ -22,7 +22,11 @@
     "MISSING_ID_TOKEN": "Missing Google ID Token!",
     "GOOGLE_TOKEN_INVALID": "Google token verification failed!",
     "GOOGLE_PAYLOAD_MISSING": "Could not retrieve information from Google account!",
-    "SERVER_CONFIG_ERROR": "Server is not configured correctly!"
+    "SERVER_CONFIG_ERROR": "Server is not configured correctly!",
+    "OTP_SENT": "OTP has been sent!",
+    "OTP_VERIFIED": "OTP verified successfully!",
+    "INVALID_OTP": "Invalid OTP!",
+    "EXPIRED_OTP": "OTP has expired!"
   },
   "chat": {
     "CONVERSATION_CREATED": "Conversation created successfully!",
