@@ -29,9 +29,7 @@
     "EXPIRED_OTP": "Mã OTP đã hết hạn!",
     "MISSING_EMAIL": "Email là bắt buộc để xác thực OTP!",
     "PASSWORD_MISMATCH": "Mật khẩu và xác nhận mật khẩu không khớp!",
-    "MISSING_CONTACT": "Email và số điện thoại là bắt buộc để đăng ký!",
-    "MISSING_OTP": "OTP là bắt buộc để đăng ký!",
-    "USER_ALREADY_EXISTS": "Một người dùng với email hoặc số điện thoại này đã tồn tại!"
+    "MISSING_CONTACT": "Email và số điện thoại là bắt buộc để đăng ký!"
   },
   "chat": {
     "CONVERSATION_CREATED": "Tạo cuộc trò chuyện thành công!",

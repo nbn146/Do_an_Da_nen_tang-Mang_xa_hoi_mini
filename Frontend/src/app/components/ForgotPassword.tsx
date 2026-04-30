@@ -4,11 +4,13 @@ import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import axios from "axios";
 
+
 export function ForgotPassword() {
   // Các state quản lý dữ liệu
   const [account, setAccount] = useState("");
   const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  
   
   // Quản lý trạng thái UI
   const [step, setStep] = useState(1); // 1: Nhập Account, 2: Nhập OTP
@@ -35,13 +37,19 @@ export function ForgotPassword() {
         alert("Mã OTP đã được gửi vào số điện thoại của bạn!");
         
         // Thành công -> Chuyển sang Bước 2
-        setStep(2); 
+       
       } else {
         // NẾU LÀ EMAIL -> Xử lý gửi link vào Email
         console.log("Xử lý gửi link reset vào Email:", account);
+        
+        await axios.post('http://localhost:3000/api/auth/sendEmailOtp', {
+          email: account
+        });
         alert("Link khôi phục đã được gửi vào Email của bạn!");
-        navigate('/login');
+        
+
       }
+       setStep(2); 
     } catch (error: any) {
       setError(error.response?.data?.message || 'Lỗi gửi yêu cầu!');
     }   
@@ -53,10 +61,12 @@ export function ForgotPassword() {
     setError("");
 
     try {
+      const isPhone = isPhoneNumber(account);
       // ⚡️ GỌI API THỰC TẾ XUỐNG BACKEND Ở ĐÂY
       // Truyền đúng 3 trường: phone_number, otp, và newPassword
       await axios.post('http://localhost:3000/api/auth/resetPassword', {
-        phone_number: account,
+        phone_number: isPhone ? account : undefined,
+        email: !isPhone ? account : undefined,
         otp: otp,
         newPassword: newPassword
       });

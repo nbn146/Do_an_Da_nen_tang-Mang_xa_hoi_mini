@@ -29,9 +29,7 @@
     "EXPIRED_OTP": "OTP has expired!",
     "MISSING_EMAIL": "Email is required for OTP verification!",
     "PASSWORD_MISMATCH": "Password and confirm password do not match!",
-    "MISSING_CONTACT": "Email and phone number are required for registration!",
-    "MISSING_OTP": "OTP is required for registration!",
-    "USER_ALREADY_EXISTS": "A user with this email or phone number already exists!"
+    "MISSING_CONTACT": "Email and phone number are required for registration!"
   },
   "chat": {
     "CONVERSATION_CREATED": "Conversation created successfully!",

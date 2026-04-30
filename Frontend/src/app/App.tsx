@@ -14,6 +14,8 @@ import { RegisterView } from './components/RegisterView';
 import { SocialMediaApp} from './components/SocialMediaApp';
 import { ForgotPassword } from './components/ForgotPassword';
 
+
+
 function App() {
   return (
     <Routes>
