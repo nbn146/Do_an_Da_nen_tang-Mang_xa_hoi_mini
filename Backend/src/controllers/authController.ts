@@ -5,6 +5,7 @@ import { OAuth2Client } from "google-auth-library";
 import User from "../models/User.js";
 import { successResponse, errorResponse } from "../utils/response.js";
 import otpModels from "../models/otpModels.js";
+import { env } from "../config/env.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_key";
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -14,15 +15,16 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 // ─────────────────────────────────────────────
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { username, email, phone_number, password, display_name, otp } = req.body;
+    const { username, email, phone_number, password, display_name, otp } =
+      req.body;
 
     const existingUsername = await User.findOne({ username });
 
-    if(!email && !phone_number){
+    if (!email && !phone_number) {
       errorResponse(req, res, "auth.MISSING_CONTACT", 400, "MISSING_CONTACT");
       return;
     }
-    if (!otp){
+    if (!otp) {
       errorResponse(req, res, "auth.MISSING_OTP", 400, "MISSING_OTP");
       return;
     }
@@ -42,13 +44,24 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const userQuery = phone_number ? { phone_number } : { email };
     const existingUser = await User.findOne(userQuery);
     if (existingUser) {
-      errorResponse(req, res, "auth.USER_ALREADY_EXISTS", 400, "USER_ALREADY_EXISTS");
+      errorResponse(
+        req,
+        res,
+        "auth.USER_ALREADY_EXISTS",
+        400,
+        "USER_ALREADY_EXISTS",
+      );
       return;
     }
 
-  
     if (existingUsername) {
-      errorResponse(req, res, "auth.DUPLICATE_USERNAME", 400, "DUPLICATE_USERNAME");
+      errorResponse(
+        req,
+        res,
+        "auth.DUPLICATE_USERNAME",
+        400,
+        "DUPLICATE_USERNAME",
+      );
       return;
     }
     //   req: Request,       // 👈 Bổ sung req vào đây
@@ -68,13 +81,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     if (phone_number?.trim()) {
       const existingPhone = await User.findOne({ phone_number });
       if (existingPhone) {
-        errorResponse(
-          req,
-          res,
-          "auth.DUPLICATE_PHONE",
-          400,
-          "DUPLICATE_PHONE",
-        );
+        errorResponse(req, res, "auth.DUPLICATE_PHONE", 400, "DUPLICATE_PHONE");
         return;
       }
     }
@@ -99,66 +106,59 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     console.error("Error:", error);
 
     if (error.code === 11000) {
-      errorResponse(
-        req,
-        res,
-        "auth.DUPLICATE_KEY",
-        400,
-        "DUPLICATE_KEY",
-      );
+      errorResponse(req, res, "auth.DUPLICATE_KEY", 400, "DUPLICATE_KEY");
     } else if (error.name === "ValidationError") {
       errorResponse(req, res, "auth.VALIDATION_ERROR", 400, "VALIDATION_ERROR");
     } else {
-      errorResponse(
-        req,
-        res,
-        "auth.SERVER_ERROR",
-        500,
-        "SERVER_ERROR",
-      );
+      errorResponse(req, res, "auth.SERVER_ERROR", 500, "SERVER_ERROR");
     }
   }
 };
 
 // OTP
-const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
-export const sendPhoneOtp = async (req: Request, res: Response): Promise<void> => {
-  try{
+const generateOtp = () =>
+  Math.floor(100000 + Math.random() * 900000).toString();
+export const sendPhoneOtp = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
     const { phone_number } = req.body;
-    if(!phone_number){
-      errorResponse(req, res, "auth.MISSING_PHONE_NUMBER", 400, "MISSING_PHONE_NUMBER");
+    if (!phone_number) {
+      errorResponse(
+        req,
+        res,
+        "auth.MISSING_PHONE_NUMBER",
+        400,
+        "MISSING_PHONE_NUMBER",
+      );
       return;
     }
     const otp = generateOtp();
     const expires_at = new Date(Date.now() + 5 * 60 * 1000); // OTP có hiệu lực trong 5 phút
 
-    await otpModels.deleteMany({phone_number}); // Xóa OTP cũ nếu tồn tại
-    await otpModels.create({phone_number, otp, expires_at});
+    await otpModels.deleteMany({ phone_number }); // Xóa OTP cũ nếu tồn tại
+    await otpModels.create({ phone_number, otp, expires_at });
 
-  
     console.log(`[MOCK SMS] Gửi tới SĐT: ${phone_number}`);
-    console.log(`[MOCK SMS] Nội dung: Mã xác nhận Mạng Xã Hội của bạn là: ${otp}. Mã có hiệu lực trong 3 phút.`);
-  
+    console.log(
+      `[MOCK SMS] Nội dung: Mã xác nhận Mạng Xã Hội của bạn là: ${otp}. Mã có hiệu lực trong 3 phút.`,
+    );
 
     successResponse(req, res, null, "auth.OTP_SENT", 200, "OTP_SENT");
-
-  }
-  catch(error: any){
+  } catch (error: any) {
     console.error("Error:", error);
-    errorResponse(
-      req,
-      res,
-      "common.SERVER_ERROR",
-      500,
-      "SERVER_ERROR",
-    );
+    errorResponse(req, res, "common.SERVER_ERROR", 500, "SERVER_ERROR");
   }
-}
+};
 
 //QUÊN MẬT KHẨU
-export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+export const resetPassword = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
-    const { phone_number,email, otp, newPassword } = req.body;
+    const { phone_number, email, otp, newPassword } = req.body;
 
     // 1. TÌM VÀ SO SÁNH OTP (Logic này giống hệt lúc Đăng ký)
     const query = phone_number ? { phone_number, otp } : { email, otp };
@@ -192,25 +192,32 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
     await user.save();
 
     // Xóa OTP cũ cho sạch DB
-   await otpModels.deleteMany(phone_number ? { phone_number } : { email });
+    await otpModels.deleteMany(phone_number ? { phone_number } : { email });
 
-    successResponse(req, res, null, "auth.PASSWORD_RESET_SUCCESS", 200, "PASSWORD_RESET_SUCCESS");
-
+    successResponse(
+      req,
+      res,
+      null,
+      "auth.PASSWORD_RESET_SUCCESS",
+      200,
+      "PASSWORD_RESET_SUCCESS",
+    );
   } catch (error: any) {
     console.error("Error:", error);
     errorResponse(req, res, "common.SERVER_ERROR", 500, "SERVER_ERROR");
   }
 };
 
-
-
 //XAC THUC OTP
-export const verifyPhoneOtp = async (req: Request, res: Response): Promise<void> => {
-  try{
+export const verifyPhoneOtp = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
     const { phone_number, otp } = req.body;
-    const otpRecord =   await otpModels.findOne({phone_number, otp});
+    const otpRecord = await otpModels.findOne({ phone_number, otp });
 
-    if(!otpRecord){
+    if (!otpRecord) {
       errorResponse(req, res, "auth.INVALID_OTP", 400, "INVALID_OTP");
       return;
     }
@@ -218,24 +225,19 @@ export const verifyPhoneOtp = async (req: Request, res: Response): Promise<void>
       errorResponse(req, res, "auth.EXPIRED_OTP", 400, "EXPIRED_OTP");
       return;
     }
-    await otpModels.deleteMany({phone_number}); // Xóa OTP sau khi xác thực thành công
+    await otpModels.deleteMany({ phone_number }); // Xóa OTP sau khi xác thực thành công
     successResponse(req, res, null, "auth.OTP_VERIFIED", 200, "OTP_VERIFIED");
-  }
-  catch(error: any){
+  } catch (error: any) {
     console.error("Error:", error);
-    errorResponse(
-      req,
-      res,
-      "common.SERVER_ERROR",
-      500,
-      "SERVER_ERROR",
-    );
+    errorResponse(req, res, "common.SERVER_ERROR", 500, "SERVER_ERROR");
   }
- 
-}
+};
 
 //Xac thuc tp cho email
-export const sendEmailOtp = async (req: Request, res: Response): Promise<void> => {
+export const sendEmailOtp = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
     const { email } = req.body;
     if (!email) {
@@ -250,26 +252,30 @@ export const sendEmailOtp = async (req: Request, res: Response): Promise<void> =
     await otpModels.deleteMany({ email });
     await otpModels.create({ email, otp, expires_at });
 
-    // ⚡ MOCK GỬI EMAIL 
+    // ⚡ MOCK GỬI EMAIL
     console.log(`\n📧 =======================================`);
     console.log(`[MOCK EMAIL] Gửi tới Email: ${email}`);
-    console.log(`[MOCK EMAIL] Nội dung: Mã khôi phục mật khẩu của bạn là: ${otp}`);
+    console.log(
+      `[MOCK EMAIL] Nội dung: Mã khôi phục mật khẩu của bạn là: ${otp}`,
+    );
     console.log(`==========================================\n`);
 
     successResponse(req, res, null, "auth.OTP_SENT", 200, "OTP_SENT");
-
   } catch (error: any) {
     console.error("Error:", error);
     errorResponse(req, res, "common.SERVER_ERROR", 500, "SERVER_ERROR");
   }
 };
 //XacThuc Email OTP
-export const verifyEmailOtp = async (req: Request, res: Response): Promise<void> => {
-  try{
+export const verifyEmailOtp = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
     const { email, otp } = req.body;
-    const otpRecord =   await otpModels.findOne({email, otp});
+    const otpRecord = await otpModels.findOne({ email, otp });
 
-    if(!otpRecord){
+    if (!otpRecord) {
       errorResponse(req, res, "auth.INVALID_OTP", 400, "INVALID_OTP");
       return;
     }
@@ -277,21 +283,13 @@ export const verifyEmailOtp = async (req: Request, res: Response): Promise<void>
       errorResponse(req, res, "auth.EXPIRED_OTP", 400, "EXPIRED_OTP");
       return;
     }
-    await otpModels.deleteMany({email}); // Xóa OTP sau khi xác thực thành công
+    await otpModels.deleteMany({ email }); // Xóa OTP sau khi xác thực thành công
     successResponse(req, res, null, "auth.OTP_VERIFIED", 200, "OTP_VERIFIED");
-  }
-  catch(error: any){
+  } catch (error: any) {
     console.error("Error:", error);
-    errorResponse(
-      req,
-      res,
-      "common.SERVER_ERROR",
-      500,
-      "SERVER_ERROR",
-    );
+    errorResponse(req, res, "common.SERVER_ERROR", 500, "SERVER_ERROR");
   }
- 
-}
+};
 
 // ─────────────────────────────────────────────
 // [POST] /api/auth/login
@@ -316,29 +314,17 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     });
 
     if (!user) {
-      errorResponse(
-        req,
-        res,
-        "auth.USER_NOT_FOUND",
-        401,
-        "USER_NOT_FOUND",
-      );
+      errorResponse(req, res, "auth.USER_NOT_FOUND", 401, "USER_NOT_FOUND");
       return;
     }
 
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
-      errorResponse(
-        req,
-        res,
-        "auth.INVALID_PASSWORD",
-        401,
-        "INVALID_PASSWORD",
-      );
+      errorResponse(req, res, "auth.INVALID_PASSWORD", 401, "INVALID_PASSWORD");
       return;
     }
 
-    const token = jwt.sign({ userId: user._id }, JWT_SECRET, {
+    const token = jwt.sign({ userId: user._id }, env.jwtSecret, {
       expiresIn: "7d",
     });
 
@@ -362,13 +348,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     );
   } catch (error) {
     console.error("Error:", error);
-    errorResponse(
-      req,
-      res,
-      "auth.SERVER_ERROR",
-      500,
-      "SERVER_ERROR",
-    );
+    errorResponse(req, res, "auth.SERVER_ERROR", 500, "SERVER_ERROR");
   }
 };
 
@@ -474,12 +454,6 @@ export const googleLogin = async (
     );
   } catch (error: any) {
     console.error("Error:", error?.message || error);
-    errorResponse(
-      req,
-      res,
-      "auth.SERVER_ERROR",
-      500,
-      "SERVER_ERROR",
-    );
+    errorResponse(req, res, "auth.SERVER_ERROR", 500, "SERVER_ERROR");
   }
 };

@@ -1,42 +1,52 @@
 import type { Request, Response } from "express";
 import express from "express";
 import mongoose from "mongoose";
+import http from "http";
 import cors from "cors";
 import dotenv from "dotenv";
-import authRoutes from "./routes/authRoutes.js"; // Import Route vừa tạo
+import authRoutes from "./routes/authRoutes.js";
+import conversationRoutes from "./routes/conversationRoutes.js";
 import * as middleware from "i18next-http-middleware";
 import i18next from "./config/i18n.js";
-
-
+import { initializeSocket } from "./socket.js";
 dotenv.config(); // Đọc file .env
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.DATABASE_URL || process.env.MONGO_URI;
 
+const server = http.createServer(app);
 
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true
-}));
+// Khởi tạo Socket.IO
+initializeSocket(server);
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (
+        !origin ||
+        /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+      ) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  }),
+);
 
 // Middleware phải được setup trước các routes
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // GẮN CÁC ĐƯỜNG DẪN API VÀO ĐÂY
+app.use("/uploads", express.static("uploads"));
 
 app.use(middleware.handle(i18next));
 
 app.use("/api/auth", authRoutes);
-
-
+app.use("/api/conversations", conversationRoutes);
 
 app.get("/api/test", (req: Request, res: Response) => {
   res.status(200).json({ message: "MiniSocial API đang chạy mượt mà! 🚀" });
@@ -48,7 +58,7 @@ app.use((req: Request, res: Response) => {
 });
 
 // Bắt đầu server ngay lập tức
-const server = app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 Server đang chạy tại http://localhost:${PORT}`);
 });
 
