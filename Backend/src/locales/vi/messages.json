@@ -52,6 +52,7 @@
   },
   "post": {
     "CREATED": "Tạo bài viết thành công!",
+    "CREATE_FAILED": "Tạo bài viết thất bại!",
     "UPDATED": "Cập nhật bài viết thành công!",
     "DELETED": "Xóa bài viết thành công!",
     "NOT_FOUND": "Không tìm thấy bài viết!",

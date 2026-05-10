@@ -1,3 +1,4 @@
+import "dotenv/config";
 import type { Request, Response } from "express";
 import express from "express";
 import mongoose from "mongoose";
@@ -5,11 +6,12 @@ import http from "http";
 import cors from "cors";
 import dotenv from "dotenv";
 import authRoutes from "./routes/authRoutes.js";
+import postRoutes from "./routes/postRoutes.js";
 import conversationRoutes from "./routes/conversationRoutes.js";
 import * as middleware from "i18next-http-middleware";
 import i18next from "./config/i18n.js";
 import { initializeSocket } from "./socket.js";
-dotenv.config(); // Đọc file .env
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -47,6 +49,7 @@ app.use(middleware.handle(i18next));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/conversations", conversationRoutes);
+app.use("/api/post",postRoutes);
 
 app.get("/api/test", (req: Request, res: Response) => {
   res.status(200).json({ message: "MiniSocial API đang chạy mượt mà! 🚀" });

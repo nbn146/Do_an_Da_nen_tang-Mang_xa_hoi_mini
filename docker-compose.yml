@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  minio:
+    image: quay.io/minio/minio
+    container_name: minio_server
+    ports:
+      - "9000:9000"    # Port dành cho API (Backend gọi vào đây)
+      - "9001:9001"    # Port dành cho Console (Giao diện quản lý)
+    environment:
+      MINIO_ROOT_USER: admin           # Tên đăng nhập
+      MINIO_ROOT_PASSWORD: password123 # Mật khẩu (ít nhất 8 ký tự)
+    volumes:
+      - ./data:/data                   # Lưu dữ liệu thật vào thư mục data trên máy bạn
+    command: server /data --console-address ":9001"
+    restart: always

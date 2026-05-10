@@ -52,6 +52,7 @@
   },
   "post": {
     "CREATED": "Post created successfully!",
+    "CREATE_FAILED": "Post creation failed!",
     "UPDATED": "Post updated successfully!",
     "DELETED": "Post deleted successfully!",
     "NOT_FOUND": "Post not found!",
