@@ -7,15 +7,20 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setTokenState] = useState("");
 
-  const login = async (email, password) => {
+  const login = async (account, password) => {
     try {
-      const { data } = await api.post("/auth/login", { email, password });
+      // Support both email and phone number login
+      const isPhone = /(84|0[3|5|7|8|9])+([0-9]{8})\b/.test(account);
+      const payload = isPhone
+        ? { phone_number: account, password }
+        : { email: account, password };
+      const { data } = await api.post("/auth/login", payload);
       setTokenState(data.token);
       setToken(data.token);
       setUser(data.user);
       return { ok: true };
     } catch (error) {
-      const message = error.response?.data?.message || "Login failed";
+      const message = error.response?.data?.message || "Đăng nhập thất bại!";
       return { ok: false, message };
     }
   };
