@@ -8,6 +8,8 @@ export interface IUser extends Document {
     display_name: string;
     avatar_url: string;
     bio: string;
+    following: mongoose.Types.ObjectId[];
+    followers: mongoose.Types.ObjectId[];
     settings: {
         language: string;
         privacy: 'public' | 'friends' | 'private';
@@ -21,11 +23,13 @@ export interface IUser extends Document {
 const userSchema: Schema = new Schema({
     username: { type: String, required: true, unique: true, lowercase: true, trim: true },
     email:{type: String, unique: true, sparse: true, lowercase: true, trim: true},
-    phone_number: { type: String,  unique: true,sparse: true, trim: true },
+    phone_number: { type: String, unique: true, sparse: true, trim: true },
     password_hash: { type: String, required: true },
     display_name: { type: String, required: true, trim: true },
     avatar_url: { type: String, default: 'avatars/default_profile.webp' },
     bio: { type: String, default: '' },
+    following: { type: [mongoose.Schema.Types.ObjectId], ref: 'User' },
+    followers: { type: [mongoose.Schema.Types.ObjectId], ref: 'User' },
     settings: {
         language: { type: String, default: 'vi' },
         privacy: { type: String, enum: ['public', 'friends', 'private'], default: 'public' },

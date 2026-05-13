@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import mongoose from "mongoose";
 import Follow from "../models/Follows.js";
 import Block from "../models/Block.js";
-import User from "../models/User.js";
+import User from "../models/userModel.js";
 import { successResponse, errorResponse } from "../utils/response.js";
 import { createNotification } from "./notificationController.js";
 

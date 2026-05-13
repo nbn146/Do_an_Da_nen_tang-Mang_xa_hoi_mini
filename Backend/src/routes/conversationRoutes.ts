@@ -7,7 +7,7 @@ import {
   deleteMessage,
   markAsRead,
 } from "../controllers/conversationController.js";
-import { protect as authenticate } from "../middleware/auth.js";
+import { verifyToken as authenticate } from "../middleware/authMiddleware.js";
 import { uploadMiddleware } from "../middleware/upload.js";
 
 const router = Router();

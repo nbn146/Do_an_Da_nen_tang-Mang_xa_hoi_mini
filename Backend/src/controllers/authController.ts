@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
-import User from "../models/User.js";
+import User from "../models/userModel.js";
 import { successResponse, errorResponse } from "../utils/response.js";
 import otpModels from "../models/otpModels.js";
 import { env } from "../config/env.js";
