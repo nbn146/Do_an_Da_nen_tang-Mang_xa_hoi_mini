@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import mongoose from "mongoose";
 import Message from "../models/Message.js";
 import Conversation from "../models/Conversation.js";
-import { getReceiverSocketId, getIo } from "../socket.js";
+import { getReceiverSocketId, getIo } from "../sockets/state.js";
 import { successResponse, errorResponse } from "../utils/response.js";
 
 interface AuthRequest extends Request {

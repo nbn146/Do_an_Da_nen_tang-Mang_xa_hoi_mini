@@ -79,5 +79,32 @@
     "INVALID_FORMAT": "Invalid file format! Please upload an image (JPG, PNG, WEBP).",
     "FILE_TOO_LARGE": "File is too large! Maximum allowed size is 5MB.",
     "MISSING_FILE": "Please select a file to upload!"
+  },
+  "notification": {
+    "FETCHED": "Notifications fetched successfully!",
+    "UNREAD_COUNT": "Unread count fetched successfully!",
+    "MARKED_READ": "Notification marked as read!",
+    "ALL_MARKED_READ": "All notifications marked as read!",
+    "DELETED": "Notification deleted successfully!",
+    "NOT_FOUND": "Notification not found!",
+    "INVALID_ID": "Invalid notification ID!"
+  },
+  "follow": {
+    "FOLLOW_SUCCESS": "Followed successfully!",
+    "UNFOLLOW_SUCCESS": "Unfollowed successfully!",
+    "BLOCK_SUCCESS": "User blocked successfully!",
+    "UNBLOCK_SUCCESS": "User unblocked successfully!",
+    "STATUS_FETCHED": "Follow status fetched successfully!",
+    "FOLLOWERS_FETCHED": "Followers list fetched successfully!",
+    "FOLLOWING_FETCHED": "Following list fetched successfully!",
+    "PENDING_FETCHED": "Pending requests fetched successfully!",
+    "COUNTS_FETCHED": "Follow counts fetched successfully!",
+    "REQUEST_ACCEPTED": "Follow request accepted!",
+    "REQUEST_REJECTED": "Follow request rejected!",
+    "REQUEST_NOT_FOUND": "Follow request not found!",
+    "CANNOT_FOLLOW_SELF": "You cannot follow yourself!",
+    "CANNOT_BLOCK_SELF": "You cannot block yourself!",
+    "USER_BLOCKED": "Cannot perform this action because the user is blocked!",
+    "INVALID_ID": "Invalid ID!"
   }
 }

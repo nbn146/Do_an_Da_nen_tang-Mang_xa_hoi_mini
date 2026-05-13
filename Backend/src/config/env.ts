@@ -1,0 +1,12 @@
+import dotenv from "dotenv";
+dotenv.config();
+export const env = {
+  port: process.env.PORT || 3000,
+  mongoUri: process.env.MONGO_URI || "mongodb://127.0.0.1:27017/mini_social",
+  jwtSecret: process.env.JWT_SECRET || "dev_secret",
+  googleClientId: process.env.GOOGLE_CLIENT_ID || "",
+  minioEndpoint: process.env.MINIO_ENDPOINT || "localhost",
+  minioPort: parseInt(process.env.MINIO_PORT || "9000"),
+  minioAccessKey: process.env.MINIO_ACCESS_KEY || "admin",
+  minioSecretKey: process.env.MINIO_SECRET_KEY || "password123",
+};

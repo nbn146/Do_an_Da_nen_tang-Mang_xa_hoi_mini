@@ -79,5 +79,32 @@
     "INVALID_FORMAT": "Định dạng tệp không hợp lệ! Vui lòng tải lên ảnh (JPG, PNG, WEBP).",
     "FILE_TOO_LARGE": "Tệp quá lớn! Kích thước tối đa cho phép là 5MB.",
     "MISSING_FILE": "Vui lòng chọn tệp để tải lên!"
+  },
+  "notification": {
+    "FETCHED": "Lấy danh sách thông báo thành công!",
+    "UNREAD_COUNT": "Lấy số thông báo chưa đọc thành công!",
+    "MARKED_READ": "Đã đánh dấu thông báo là đã đọc!",
+    "ALL_MARKED_READ": "Đã đánh dấu tất cả thông báo là đã đọc!",
+    "DELETED": "Xóa thông báo thành công!",
+    "NOT_FOUND": "Không tìm thấy thông báo!",
+    "INVALID_ID": "ID thông báo không hợp lệ!"
+  },
+  "follow": {
+    "FOLLOW_SUCCESS": "Theo dõi thành công!",
+    "UNFOLLOW_SUCCESS": "Hủy theo dõi thành công!",
+    "BLOCK_SUCCESS": "Chặn người dùng thành công!",
+    "UNBLOCK_SUCCESS": "Bỏ chặn người dùng thành công!",
+    "STATUS_FETCHED": "Lấy trạng thái theo dõi thành công!",
+    "FOLLOWERS_FETCHED": "Lấy danh sách người theo dõi thành công!",
+    "FOLLOWING_FETCHED": "Lấy danh sách đang theo dõi thành công!",
+    "PENDING_FETCHED": "Lấy danh sách yêu cầu đang chờ thành công!",
+    "COUNTS_FETCHED": "Lấy số lượng theo dõi thành công!",
+    "REQUEST_ACCEPTED": "Đã chấp nhận yêu cầu theo dõi!",
+    "REQUEST_REJECTED": "Đã từ chối yêu cầu theo dõi!",
+    "REQUEST_NOT_FOUND": "Không tìm thấy yêu cầu theo dõi!",
+    "CANNOT_FOLLOW_SELF": "Bạn không thể tự theo dõi chính mình!",
+    "CANNOT_BLOCK_SELF": "Bạn không thể tự chặn chính mình!",
+    "USER_BLOCKED": "Không thể thực hiện hành động này do người dùng đã bị chặn!",
+    "INVALID_ID": "ID không hợp lệ!"
   }
 }
