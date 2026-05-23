@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import mongoose from "mongoose";
 import Message from "../models/Message.js";
 import Conversation from "../models/Conversation.js";
+import { uploadAndCompressImage, uploadRawFile } from "../services/minioService.js";
 import { getReceiverSocketId, getIo } from "../sockets/state.js";
 import { successResponse, errorResponse } from "../utils/response.js";
 
@@ -32,18 +33,25 @@ export const getConversations = async (
       });
 
     // Ẩn bản thân khỏi danh sách participants để FE dễ dùng
-    const result = conversations.map((conv: any) => {
+    const result = await Promise.all(conversations.map(async (conv: any) => {
       const other = (conv.participants as any[]).find(
         (p) => p._id.toString() !== userId,
       );
+      const unreadCount = await Message.countDocuments({
+        conversationId: conv._id,
+        receiverId: new mongoose.Types.ObjectId(userId),
+        readAt: null,
+        deletedBy: { $ne: new mongoose.Types.ObjectId(userId) },
+      });
+
       return {
         _id: conv._id,
         partner: other ?? null,
         lastMessage: conv.lastMessage,
-        unreadCount: conv.unreadCount.get(userId) ?? 0,
+        unreadCount,
         updatedAt: conv.updatedAt,
       };
-    });
+    }));
 
     successResponse(
       req,
@@ -186,7 +194,7 @@ export const getMessages = async (
       .sort({ createdAt: -1 }) // Mới nhất lên đầu để phân trang dễ
       .skip((page - 1) * limit)
       .limit(limit)
-      .populate("sender", "_id username display_name avatar_url");
+      .populate("senderId", "_id username display_name avatar_url");
 
     successResponse(
       req,
@@ -220,16 +228,13 @@ export const sendMessage = async (
   res: Response,
 ): Promise<void> => {
   try {
+    console.log("📦 1. Dữ liệu Body (Frontend gửi):", req.body);
+    console.log("🔗 2. Dữ liệu Params (Trên URL):", req.params);
+    console.log("👤 3. Dữ liệu User (Từ Token):", req.userId);
     const senderId = req.userId as string;
     const { conversationId } = req.params as { conversationId: string };
-    const { content, messageType = "text" } = req.body;
-
-    // Nếu có file upload từ multer → tạo URL đầy đủ để Frontend dùng được luôn
     const uploadedFile = (req as any).file as Express.Multer.File | undefined;
-    const baseUrl = `${req.protocol}://${req.get("host")}`;
-    const mediaUrl: string | undefined = uploadedFile
-      ? `${baseUrl}/uploads/${uploadedFile.filename}`
-      : req.body.mediaUrl;
+    let { content = "", messageType = "text", mediaUrl } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(conversationId)) {
       errorResponse(
@@ -239,6 +244,26 @@ export const sendMessage = async (
         400,
         "INVALID_CONVERSATION_ID",
       );
+      return;
+    }
+
+    if (uploadedFile) {
+      const isImage = uploadedFile.mimetype.startsWith("image/");
+      messageType = isImage ? "image" : "file";
+      mediaUrl = isImage
+        ? await uploadAndCompressImage(uploadedFile.buffer)
+        : await uploadRawFile(
+            uploadedFile.buffer,
+            uploadedFile.originalname,
+            uploadedFile.mimetype,
+          );
+      if (!content?.trim()) {
+        content = uploadedFile.originalname;
+      }
+    }
+
+    if (!["text", "image", "file"].includes(messageType)) {
+      errorResponse(req, res, "chat.INVALID_MESSAGE_TYPE", 400, "INVALID_MESSAGE_TYPE");
       return;
     }
 
@@ -294,8 +319,8 @@ export const sendMessage = async (
     // Tạo tin nhắn mới
     const messageData: Record<string, unknown> = {
       conversationId,
-      sender: new mongoose.Types.ObjectId(senderId),
-      receiver: new mongoose.Types.ObjectId(receiverId),
+      senderId: new mongoose.Types.ObjectId(senderId),
+      receiverId: new mongoose.Types.ObjectId(receiverId),
       messageType,
       content: content?.trim() ?? "",
       deliveredAt: null,
@@ -306,6 +331,7 @@ export const sendMessage = async (
     }
 
     const newMessage = await Message.create(messageData);
+    console.log("🔥 Dữ liệu chuẩn bị nhét vào MongoDB:", newMessage);
 
     // Cập nhật lastMessage + tăng unreadCount cho receiver
     await Conversation.findByIdAndUpdate(conversationId, {
@@ -315,7 +341,7 @@ export const sendMessage = async (
     });
 
     const populated = await newMessage.populate(
-      "sender",
+      "senderId",
       "_id username display_name avatar_url",
     );
 
@@ -341,8 +367,9 @@ export const sendMessage = async (
       201,
       "SEND_SUCCESS",
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in sendMessage:", error);
+    console.error("🔥 Thủ phạm bị bắt:", JSON.stringify(error.errInfo, null, 2));
     errorResponse(req, res, "common.SERVER_ERROR", 500, "SERVER_ERROR");
   }
 };
@@ -480,7 +507,7 @@ export const markAsRead = async (
     await Message.updateMany(
       {
         conversationId,
-        receiver: new mongoose.Types.ObjectId(userId),
+        receiverId: new mongoose.Types.ObjectId(userId),
         readAt: null,
       },
       { $set: { readAt: now } },
