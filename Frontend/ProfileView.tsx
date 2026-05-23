@@ -1,183 +1,454 @@
-import { useState } from "react";
-import { GoogleLogin } from '@react-oauth/google';
-import { Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react";
-import { useNavigate, Link } from "react-router-dom";
-import { motion } from "motion/react";
-import { authService } from "../../services/authService";
+import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  ArrowLeft,
+  CheckCheck,
+  FileText,
+  Image,
+  Loader2,
+  MoreVertical,
+  Paperclip,
+  Search,
+  Send,
+  Smile,
+} from "lucide-react";
+import { toast } from "sonner";
+import { copyText } from "../../utils/share";
+import { useConversations, useMessages } from "../../hooks/useConversations";
+import { useCurrentUser } from "../../hooks/useCurrentUser";
 import { useLangText } from "../../hooks/useLangText";
 
+interface MessagesViewProps {
+  initialConversationId?: string | null;
+}
 
-export function LoginView() {
+function timeAgo(dateStr: string, text: (vi: string, en: string) => string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return text("Vừa xong", "Just now");
+  if (minutes < 60) return text(`${minutes} phút`, `${minutes} min`);
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return text(`${hours} giờ`, `${hours} hr`);
+  const days = Math.floor(hours / 24);
+  if (days < 7) return text(`${days} ngày`, `${days} d`);
+  return new Date(dateStr).toLocaleDateString(text("vi-VN", "en-US"));
+}
+
+const QUICK_EMOJIS = ["😀", "😂", "😍", "👍", "🙏", "🔥", "🎉", "❤️"];
+
+export function MessagesView({ initialConversationId = null }: MessagesViewProps) {
+  const currentUser = useCurrentUser();
   const text = useLangText();
-  const [account, setAccount] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
-  const navigate = useNavigate();
+  const {
+    conversations,
+    isLoading: convLoading,
+    markConversationRead,
+    refetch,
+  } = useConversations();
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(
+    initialConversationId,
+  );
+  const [messageText, setMessageText] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showChatOptions, setShowChatOptions] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 1. Xử lý Đăng nhập thông thường (Email hoặc Số điện thoại + Password)
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    try {
-      const data = await authService.login(account, password);
+  const {
+    messages,
+    isLoading: msgLoading,
+    isTyping,
+    sendMessage,
+    sendAttachment,
+    sendTyping,
+    markAsRead,
+  } = useMessages(selectedConversationId);
 
-      // Lưu cả Token và thông tin User
-      localStorage.setItem('userToken', data.token);
-      const normalizedUser = { ...data.user, _id: data.user._id || data.user.id };
-      localStorage.setItem('userData', JSON.stringify(normalizedUser));
-      
-      // Security fix: không log token ra console
-      navigate('/'); 
-    } catch (error: any) {
-      const serverMessage = error.response?.data?.message || text("Lỗi kết nối server!", "Server connection error!");
-      setError(serverMessage);
+  useEffect(() => {
+    if (!initialConversationId) return;
+    setSelectedConversationId(initialConversationId);
+    void refetch();
+  }, [initialConversationId, refetch]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  useEffect(() => {
+    if (selectedConversationId) {
+      markConversationRead(selectedConversationId);
+      void markAsRead();
     }
+    setShowChatOptions(false);
+    setShowEmojiPicker(false);
+  }, [selectedConversationId, markAsRead, markConversationRead]);
+
+  useEffect(() => {
+    if (!selectedConversationId || messages.length === 0) return;
+    markConversationRead(selectedConversationId);
+    void markAsRead();
+  }, [messages.length, selectedConversationId, markAsRead, markConversationRead]);
+
+  const filteredConversations = conversations.filter((conv) => {
+    const partner = conv.partner;
+    if (!partner) return false;
+    const name = partner.display_name || partner.username || "";
+    return name.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
+  const selectedConv = conversations.find((conv) => conv._id === selectedConversationId);
+  const selectedPartner = selectedConv?.partner;
+
+  const handleSendMessage = useCallback(async () => {
+    if (!messageText.trim()) return;
+    try {
+      await sendMessage(messageText);
+      setMessageText("");
+      void refetch();
+    } catch {
+      toast.error(text("Không thể gửi tin nhắn.", "Could not send message."));
+    }
+  }, [messageText, refetch, sendMessage, text]);
+
+  const handleAttachmentChange = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>, messageType: "image" | "file") => {
+      const file = event.target.files?.[0];
+      event.target.value = "";
+      if (!file) return;
+
+      try {
+        setIsUploading(true);
+        await sendAttachment(file, messageType);
+        void refetch();
+      } catch (err: any) {
+        toast.error(err.response?.data?.message || text("Không thể gửi tệp đính kèm.", "Could not send attachment."));
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    [refetch, sendAttachment, text],
+  );
+
+  const handleSelectEmoji = useCallback((emoji: string) => {
+    setMessageText((value) => `${value}${emoji}`);
+    setShowEmojiPicker(false);
+  }, []);
+
+  const handleInputChange = (value: string) => {
+    setMessageText(value);
+    if (selectedPartner && value.trim()) sendTyping(selectedPartner._id);
   };
 
-  // 2. Xử lý Đăng nhập Google (Gộp 2 hàm cũ thành 1 cho gọn)
-  const handleGoogleSuccess = async (credentialResponse: any) => {
-
-    try {
-      const idToken = credentialResponse.credential;
-      
-      // Gọi service gửi idToken xuống Backend
-      const data = await authService.googleLogin(idToken);
-      
-      // Lưu "chìa khóa" vào trình duyệt
-      localStorage.setItem('userToken', data.token);
-      const normalizedUser = { ...data.user, _id: data.user._id || data.user.id };
-      localStorage.setItem('userData', JSON.stringify(normalizedUser));
-      
-      // Đăng nhập Google thành công — không log dữ liệu nhạy cảm
-      
-      // ĐIỀU HƯỚNG VỀ TRANG CHỦ
-      navigate('/'); 
-    } catch (error: any) {
-      console.error("Lỗi xác thực Google:", error);
-      alert(error.response?.data?.message || text("Lỗi xác thực Google với Server!", "Google authentication failed on the server!"));
-    }
-  };
+  const partnerAvatar = selectedPartner
+    ? selectedPartner.avatar_url ||
+      selectedPartner.avatar ||
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedPartner.display_name || selectedPartner.username)}&background=7c3aed&color=fff`
+    : "";
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
-      {/* Background Orbs giữ nguyên... */}
-      <div className="absolute top-0 left-0 w-96 h-96 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob"></div>
-      <div className="absolute top-0 right-0 w-96 h-96 bg-yellow-300 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob animation-delay-2000"></div>
-      <div className="absolute -bottom-8 left-20 w-96 h-96 bg-pink-300 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob animation-delay-4000"></div>
-
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-md p-8 relative z-10"
-      >
-        <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/50 p-8">
-          <div className="text-center mb-10">
-            <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg mx-auto mb-6 transform rotate-12 hover:rotate-0 transition-transform duration-300">
-              <span className="text-white text-3xl font-bold">S</span>
-            </div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">{text("Chào mừng trở lại", "Welcome back")}</h2>
-            <p className="text-gray-500">{text("Đăng nhập để kết nối với bạn bè", "Log in to connect with friends")}</p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-6">
-            {/* Thông báo lỗi */}
-            {error && (
-              <div className="p-3 bg-red-50 text-red-600 text-sm rounded-xl border border-red-100">
-                {error}
-              </div>
-            )}
-
-            {/* Input Email hoặc Số điện thoại */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">{text("Email hoặc số điện thoại", "Email or phone number")}</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  required
-                  value={account}
-                  onChange={(e) => setAccount(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-white/50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all"
-                  placeholder={text("Nhập email hoặc số điện thoại", "Enter email or phone number")}
-                />
-              </div>
-            </div>
-
-            {/* Input Mật khẩu */}
-            <div>
-              <div className="flex item-center justify-between mb-2">
-      <label className="text-sm font-medium text-gray-700">{text("Mật khẩu", "Password")}</label>
-      <Link to="/forgot-password" className="text-sm font-semibold text-purple-600 hover:text-purple-700 transition-colors">
-              {text("Quên mật khẩu", "Forgot password")}
-            </Link>
-      
-      </div>
-      <div className="relative">
-        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-        
-        <input
-          type={showPassword ? "text" : "password"} // Thay đổi type dựa trên state
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full pl-12 pr-12 py-3 bg-white/50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
-          placeholder={text("Nhập mật khẩu", "Enter password")}
-        />
-        {/* Nút bật/tắt mắt */}
-        <button
-          type="button"
-          onClick={() => setShowPassword(!showPassword)}
-          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+    <div className="h-full max-w-6xl mx-auto">
+      <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg overflow-hidden h-full flex">
+        <div
+          className={`w-full md:w-96 border-r border-gray-200 flex flex-col ${
+            selectedConversationId ? "hidden md:flex" : "flex"
+          }`}
         >
-          {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-        </button>
-      </div>
-    </div>
-            
-
-            <button
-              type="submit"
-              className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white py-3 px-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 font-medium group"
-            >
-              <span>{text("Đăng nhập", "Log in")}</span>
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </button>
-          </form>
-
-          {/* Google Login Section */}
-          <div className="mt-8">
+          <div className="p-4 border-b border-gray-200">
+            <h2 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-3">
+              {text("Tin nhắn", "Messages")}
+            </h2>
             <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">{text("Hoặc tiếp tục với", "Or continue with")}</span>
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-center">
-              <div className="w-full max-w-[250px] overflow-hidden rounded-xl border border-gray-200 hover:shadow-sm transition-all">
-                <GoogleLogin
-                  onSuccess={handleGoogleSuccess}
-                  onError={() => alert(text("Đăng nhập Google thất bại!", "Google login failed!"))}
-                  useOneTap
-                  theme="outline"
-                  shape="rectangular"
-                  width="250"
-                />
-              </div>
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder={text("Tìm kiếm...", "Search...")}
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-gray-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
             </div>
           </div>
 
-          <p className="mt-8 text-center text-sm text-gray-600">
-            {text("Chưa có tài khoản?", "No account yet?")}{" "}
-            <Link to="/register" className="font-semibold text-purple-600 hover:text-purple-700 transition-colors">
-              {text("Đăng ký ngay", "Sign up now")}
-            </Link>
-          </p>
+          <div className="flex-1 overflow-y-auto">
+            {convLoading ? (
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
+                <span className="ml-2 text-sm text-gray-500">{text("Đang tải...", "Loading...")}</span>
+              </div>
+            ) : filteredConversations.length === 0 ? (
+              <div className="p-8 text-center text-gray-400">
+                <p className="font-medium">{text("Chưa có cuộc trò chuyện nào", "No conversations yet")}</p>
+                <p className="text-sm mt-1">
+                  {text("Tìm người dùng và bấm Nhắn tin để bắt đầu.", "Find a user and choose Message to start.")}
+                </p>
+              </div>
+            ) : (
+              filteredConversations.map((conv) => {
+                const partner = conv.partner;
+                if (!partner) return null;
+                const avatar =
+                  partner.avatar_url ||
+                  partner.avatar ||
+                  `https://ui-avatars.com/api/?name=${encodeURIComponent(partner.display_name || partner.username)}&background=7c3aed&color=fff`;
+                const lastMsg = conv.lastMessage;
+                const unread = conv.unreadCount || 0;
+
+                return (
+                  <button
+                    key={conv._id}
+                    onClick={() => setSelectedConversationId(conv._id)}
+                    className={`w-full p-4 flex items-start gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100 ${
+                      selectedConversationId === conv._id ? "bg-purple-50" : ""
+                    }`}
+                  >
+                    <img src={avatar} alt={partner.display_name || partner.username} className="w-12 h-12 rounded-full object-cover" />
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="flex items-baseline justify-between mb-1">
+                        <h3 className="font-semibold text-gray-900 truncate">
+                          {partner.display_name || partner.username}
+                        </h3>
+                        {lastMsg?.createdAt ? (
+                          <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
+                            {timeAgo(lastMsg.createdAt, text)}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-gray-600 truncate">
+                          {lastMsg?.content || text("Bắt đầu cuộc trò chuyện...", "Start a conversation...")}
+                        </p>
+                        {unread > 0 ? (
+                          <span className="flex-shrink-0 ml-2 px-2 py-0.5 bg-purple-600 text-white text-xs rounded-full">
+                            {unread}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
         </div>
-      </motion.div>
+
+        <div className={`flex-1 flex flex-col ${selectedConversationId ? "flex" : "hidden md:flex"}`}>
+          {selectedPartner ? (
+            <>
+              <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setSelectedConversationId(null)}
+                    className="p-1 hover:bg-gray-100 rounded-full md:hidden"
+                    title={text("Quay lại", "Back")}
+                  >
+                    <ArrowLeft className="w-5 h-5 text-gray-600" />
+                  </button>
+                  <img src={partnerAvatar} alt={selectedPartner.display_name || selectedPartner.username} className="w-10 h-10 rounded-full object-cover" />
+                  <div>
+                    <h3 className="font-semibold text-gray-900">
+                      {selectedPartner.display_name || selectedPartner.username}
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      {isTyping ? text("Đang nhập...", "Typing...") : `@${selectedPartner.username}`}
+                    </p>
+                  </div>
+                </div>
+                <div className="relative flex items-center gap-2">
+                  <button
+                    onClick={() => setShowChatOptions((value) => !value)}
+                    title={text("Tùy chọn chat", "Chat options")}
+                    className="p-2 hover:bg-gray-100 rounded-full"
+                  >
+                    <MoreVertical className="w-5 h-5 text-gray-600" />
+                  </button>
+                  {showChatOptions ? (
+                    <div className="absolute right-0 top-11 z-20 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 text-sm shadow-lg">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selectedConversationId) {
+                            markConversationRead(selectedConversationId);
+                          }
+                          void markAsRead();
+                          setShowChatOptions(false);
+                          toast.success(text("Đã đánh dấu cuộc trò chuyện là đã đọc.", "Conversation marked as read."));
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-gray-50"
+                      >
+                        <CheckCheck className="h-4 w-4 text-purple-600" />
+                        {text("Đánh dấu đã đọc", "Mark as read")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void copyText(`@${selectedPartner.username}`, text("Đã sao chép tên người dùng.", "Username copied."));
+                          setShowChatOptions(false);
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-gray-50"
+                      >
+                        <FileText className="h-4 w-4 text-gray-600" />
+                        {text("Sao chép username", "Copy username")}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {msgLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
+                    <span className="ml-2 text-gray-500">{text("Đang tải tin nhắn...", "Loading messages...")}</span>
+                  </div>
+                ) : messages.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-gray-400">
+                    <p>{text("Hãy gửi lời chào đầu tiên.", "Send the first hello.")}</p>
+                  </div>
+                ) : (
+                  messages.map((message) => {
+                    const senderId = typeof message.senderId === "string" ? message.senderId : message.senderId._id;
+                    const isOwn = senderId === currentUser?._id;
+
+                    return (
+                      <div key={message._id} className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
+                        <div
+                          className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
+                            isOwn
+                              ? "bg-gradient-to-br from-purple-600 to-blue-600 text-white rounded-br-sm"
+                              : "bg-gray-100 text-gray-900 rounded-bl-sm"
+                          }`}
+                        >
+                          {message.messageType === "image" && message.mediaUrl ? (
+                            <a href={message.mediaUrl} target="_blank" rel="noreferrer" className="block">
+                              <img
+                                src={message.mediaUrl}
+                                alt={message.content || text("Ảnh đã gửi", "Sent image")}
+                                className="mb-2 max-h-72 rounded-xl object-cover"
+                              />
+                            </a>
+                          ) : null}
+                          {message.messageType === "file" && message.mediaUrl ? (
+                            <a
+                              href={message.mediaUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={`mb-2 flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${
+                                isOwn ? "bg-white/15 text-white" : "bg-white text-gray-800"
+                              }`}
+                            >
+                              <Paperclip className="h-4 w-4" />
+                              <span className="truncate">{message.content || text("Tệp đính kèm", "Attachment")}</span>
+                            </a>
+                          ) : null}
+                          {message.content && message.messageType !== "file" ? (
+                            <p className="text-sm">{message.content}</p>
+                          ) : null}
+                          <p className={`text-xs mt-1 ${isOwn ? "text-purple-100" : "text-gray-500"}`}>
+                            {timeAgo(message.createdAt, text)}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              <div className="p-4 border-t border-gray-200">
+                <div className="flex items-end gap-2">
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(event) => void handleAttachmentChange(event, "image")}
+                  />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={(event) => void handleAttachmentChange(event, "file")}
+                  />
+                  <button
+                    onClick={() => imageInputRef.current?.click()}
+                    disabled={isUploading}
+                    title={text("Gửi ảnh", "Send image")}
+                    className="p-2 hover:bg-gray-100 rounded-full flex-shrink-0 disabled:opacity-50"
+                  >
+                    <Image className="w-5 h-5 text-gray-600" />
+                  </button>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    title={text("Gửi tệp", "Send file")}
+                    className="p-2 hover:bg-gray-100 rounded-full flex-shrink-0 disabled:opacity-50"
+                  >
+                    <Paperclip className="w-5 h-5 text-gray-600" />
+                  </button>
+                  <div className="flex-1 relative">
+                    <textarea
+                      value={messageText}
+                      onChange={(event) => handleInputChange(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && !event.shiftKey) {
+                          event.preventDefault();
+                          void handleSendMessage();
+                        }
+                      }}
+                      placeholder={text("Nhập tin nhắn...", "Type a message...")}
+                      className="w-full px-4 py-2 pr-10 bg-gray-100 rounded-full resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm max-h-32"
+                      rows={1}
+                    />
+                    {showEmojiPicker ? (
+                      <div className="absolute bottom-11 right-0 z-20 grid grid-cols-4 gap-1 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
+                        {QUICK_EMOJIS.map((emoji) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => handleSelectEmoji(emoji)}
+                            className="h-9 w-9 rounded-lg text-lg hover:bg-gray-100"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                    <button
+                      onClick={() => setShowEmojiPicker((value) => !value)}
+                      title="Emoji"
+                      className="absolute right-3 bottom-2 hover:scale-110 transition-transform"
+                    >
+                      <Smile className="w-5 h-5 text-gray-400" />
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => void handleSendMessage()}
+                    disabled={!messageText.trim()}
+                    title={text("Gửi tin nhắn", "Send message")}
+                    className="p-2 bg-gradient-to-br from-purple-600 to-blue-600 text-white rounded-full hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-gray-400">
+              <div className="text-center">
+                <div className="w-24 h-24 bg-gradient-to-br from-purple-100 to-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Send className="w-12 h-12 text-purple-400" />
+                </div>
+                <p className="text-lg font-medium">{text("Chọn một cuộc trò chuyện", "Select a conversation")}</p>
+                <p className="text-sm mt-1">
+                  {text("Hoặc tìm người dùng để bắt đầu nhắn tin.", "Or find a user to start messaging.")}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
