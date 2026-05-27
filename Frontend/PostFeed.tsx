@@ -1,425 +1,189 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import {
-  X,
-  Image as ImageIcon,
-  Smile,
-  MapPin,
-  Users,
-  Globe,
-  Lock,
-  Loader2,
-} from "lucide-react";
+import { useState } from "react";
+import { Mail, KeyRound, Lock } from "lucide-react"; 
+import { useNavigate, Link } from "react-router-dom";
+import { motion } from "motion/react";
 import apiClient from "../../services/api";
-import { useCurrentUser } from "../../hooks/useCurrentUser";
 import { useLangText } from "../../hooks/useLangText";
 
-interface CreatePostModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onPostCreated?: () => void;
-}
 
-type Privacy = "public" | "friends" | "private";
-
-const PRIVACY_CONFIG: Record<Privacy, { icon: typeof Globe; label: string; labelEn: string }> = {
-  public: { icon: Globe, label: "Công khai", labelEn: "Public" },
-  friends: { icon: Users, label: "Bạn bè", labelEn: "Friends" },
-  private: { icon: Lock, label: "Chỉ mình tôi", labelEn: "Only me" },
-};
-
-const MOODS = [
-  { id: "happy", label: "vui vẻ", labelEn: "happy" },
-  { id: "grateful", label: "biết ơn", labelEn: "grateful" },
-  { id: "excited", label: "hào hứng", labelEn: "excited" },
-  { id: "relaxed", label: "thư giãn", labelEn: "relaxed" },
-  { id: "focused", label: "tập trung", labelEn: "focused" },
-  { id: "lucky", label: "may mắn", labelEn: "lucky" },
-];
-
-export function CreatePostModal({
-  isOpen,
-  onClose,
-  onPostCreated,
-}: CreatePostModalProps) {
-  const [postText, setPostText] = useState("");
-  const [privacy, setPrivacy] = useState<Privacy>("public");
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
-  const [selectedMood, setSelectedMood] = useState("");
-  const [isMoodPickerOpen, setIsMoodPickerOpen] = useState(false);
-  const [isLocationOpen, setIsLocationOpen] = useState(false);
-  const [locationDraft, setLocationDraft] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const currentUser = useCurrentUser();
+export function ForgotPassword() {
   const text = useLangText();
+  // Các state quản lý dữ liệu
+  const [account, setAccount] = useState("");
+  const [otp, setOtp] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  
+  
+  // Quản lý trạng thái UI
+  const [step, setStep] = useState(1); // 1: Nhập Account, 2: Nhập OTP
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
 
-  // Cleanup blob URLs khi component unmount hoặc files thay đổi — FIX memory leak
-  useEffect(() => {
-    return () => {
-      previewUrls.forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, [previewUrls]);
+  // Kiểm tra định dạng số điện thoại (Chỉ chứa 9-11 chữ số)
+  const isPhoneNumber = (input: string) => /^[0-9]{9,11}$/.test(input);
 
-  const handleImageSelect = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
-
-  const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files || []);
-      if (files.length === 0) return;
-
-      // Giới hạn 4 ảnh
-      const newFiles = files.slice(0, 4 - selectedFiles.length);
-      if (newFiles.length === 0) return;
-
-      setSelectedFiles((prev) => [...prev, ...newFiles]);
-
-      // Tạo preview URLs
-      const urls = newFiles.map((file) => URL.createObjectURL(file));
-      setPreviewUrls((prev) => [...prev, ...urls]);
-
-      // Reset input
-      e.target.value = "";
-    },
-    [selectedFiles.length],
-  );
-
-  const handleRemoveImage = useCallback((index: number) => {
-    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
-    setPreviewUrls((prev) => {
-      const removed = prev[index];
-      if (removed) URL.revokeObjectURL(removed);
-      return prev.filter((_, i) => i !== index);
-    });
-  }, []);
-
-  const handlePost = useCallback(async () => {
-    const moodLabel = selectedMood
-      ? MOODS.find((mood) => mood.id === selectedMood)
-      : null;
-    const details = [
-      moodLabel
-        ? `${text("Đang cảm thấy", "Feeling")} ${text(moodLabel.label, moodLabel.labelEn)}`
-        : "",
-      locationDraft.trim()
-        ? `${text("Tại", "At")} ${locationDraft.trim()}`
-        : "",
-    ].filter(Boolean);
-    const finalContent = [postText.trim(), ...details].filter(Boolean).join("\n");
-
-    if ((!finalContent && selectedFiles.length === 0) || isSubmitting) return;
-
-    setIsSubmitting(true);
+  // Xử lý Bước 1: Gửi yêu cầu
+  const handleSendRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError("");
 
     try {
-      // Dùng FormData để gửi cả text + files
-      const formData = new FormData();
-      formData.append("content", finalContent);
-      formData.append("visibility", privacy);
+      if (isPhoneNumber(account)) {
+        // NẾU LÀ SỐ ĐIỆN THOẠI -> GỌI API MOCK OTP
+        console.log("Đang gọi API /api/auth/sendPhoneOtp với số:", account);
+        console.log("Đang gọi API /api/auth/sendPhoneOtp với OTP:", otp);
+        
+        await apiClient.post('/auth/sendPhoneOtp', { phone_number: account });
+        
+        alert(text("Mã OTP đã được gửi vào số điện thoại của bạn!", "OTP has been sent to your phone number!"));
+        
+        // Thành công -> Chuyển sang Bước 2
+       
+      } else {
+        // NẾU LÀ EMAIL -> Xử lý gửi link vào Email
+        console.log("Xử lý gửi link reset vào Email:", account);
+        
+        await apiClient.post('/auth/sendEmailOtp', {
+          email: account
+        });
+        alert(text("Link khôi phục đã được gửi vào Email của bạn!", "Recovery code has been sent to your email!"));
+        
 
-      selectedFiles.forEach((file) => {
-        formData.append("images", file);
-      });
+      }
+       setStep(2); 
+    } catch (error: any) {
+      setError(error.response?.data?.message || text("Lỗi gửi yêu cầu!", "Could not send request!"));
+    }   
+  };
 
-      await apiClient.post("/post/createPost", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      // Reset form
-      setPostText("");
-      setSelectedFiles([]);
-      previewUrls.forEach((url) => URL.revokeObjectURL(url));
-      setPreviewUrls([]);
-      setPrivacy("public");
-      setSelectedMood("");
-      setLocationDraft("");
-      setIsMoodPickerOpen(false);
-      setIsLocationOpen(false);
-
-      onPostCreated?.();
-      onClose();
-    } catch (err: any) {
-      setError(err.response?.data?.message || text("Lỗi tạo bài viết!", "Could not create post."));
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [
-    postText,
-    selectedFiles,
-    selectedMood,
-    locationDraft,
-    privacy,
-    isSubmitting,
-    previewUrls,
-    onPostCreated,
-    onClose,
-    text,
-  ]);
-
-  const handleClose = useCallback(() => {
-    if (isSubmitting) return;
-    setPostText("");
-    setSelectedFiles([]);
-    previewUrls.forEach((url) => URL.revokeObjectURL(url));
-    setPreviewUrls([]);
+  // Xử lý Bước 2: Xác nhận OTP và Đổi mật khẩu
+  const handleVerifyAndReset = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError("");
-    setSelectedMood("");
-    setLocationDraft("");
-    setIsMoodPickerOpen(false);
-    setIsLocationOpen(false);
-    onClose();
-  }, [isSubmitting, previewUrls, onClose]);
 
-  // FIX: Hooks phải ở trên, return ở dưới (Rules of Hooks)
-  if (!isOpen) return null;
-
-  const PrivacyIcon = PRIVACY_CONFIG[privacy].icon;
-  const userName = currentUser?.display_name || currentUser?.username || text("Bạn", "You");
-  const selectedMoodOption = selectedMood
-    ? MOODS.find((mood) => mood.id === selectedMood)
-    : null;
-  const selectedMoodLabel = selectedMoodOption
-    ? text(selectedMoodOption.label, selectedMoodOption.labelEn)
-    : "";
-  const userAvatar =
-    (currentUser as any)?.avatar_url ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=7c3aed&color=fff`;
+    try {
+      const isPhone = isPhoneNumber(account);
+      // ⚡️ GỌI API THỰC TẾ XUỐNG BACKEND Ở ĐÂY
+      // Truyền đúng 3 trường: phone_number, otp, và newPassword
+      await apiClient.post('/auth/resetPassword', {
+        phone_number: isPhone ? account : undefined,
+        email: !isPhone ? account : undefined,
+        otp: otp,
+        newPassword: newPassword
+      });
+      
+      // Nếu Backend không báo lỗi (status 200) -> Chuyển về trang đăng nhập
+      alert(text("Đổi mật khẩu thành công! Vui lòng đăng nhập lại.", "Password changed successfully. Please log in again."));
+      navigate('/login');
+      
+    } catch (error: any) {
+      // Nếu Backend báo lỗi (Sai OTP, Hết hạn OTP...) -> Hiện lỗi màu đỏ lên màn hình
+      setError(error.response?.data?.message || text("OTP không hợp lệ hoặc đã hết hạn!", "OTP is invalid or has expired!"));
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={handleClose}
-        role="presentation"
-      ></div>
+    <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
+      {/* Background Orbs */}
+      <div className="absolute -top-32 -left-32 w-64 h-64 bg-pink-300 rounded-full opacity-70 animate-pulse"></div>
+      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-purple-300 rounded-full opacity-70 animate-pulse"></div>
 
-      {/* Modal */}
-      <div className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden animate-scale-in">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h2 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-            {text("Tạo bài viết", "Create post")}
-          </h2>
-          <button
-            onClick={handleClose}
-            aria-label={text("Đóng modal", "Close modal")}
-            className="p-1 hover:bg-gray-100 rounded-full transition-colors"
-          >
-            <X className="w-6 h-6 text-gray-600" />
-          </button>
-        </div>
-
-        {/* Error */}
-        {error ? (
-          <div className="mx-4 mt-4 p-3 bg-red-50 text-red-600 text-sm rounded-xl border border-red-100">
-            {error}
-          </div>
-        ) : null}
-
-        {/* User Info */}
-        <div className="p-4 flex items-center gap-3">
-          <img
-            src={userAvatar}
-            alt={userName}
-            className="w-12 h-12 rounded-full object-cover"
-          />
-          <div className="flex-1">
-            <h3 className="font-semibold text-gray-900">{userName}</h3>
-            <button
-              onClick={() => {
-                const privacies: Privacy[] = ["public", "friends", "private"];
-                const idx = privacies.indexOf(privacy);
-                setPrivacy(privacies[(idx + 1) % privacies.length]);
-              }}
-              className="flex items-center gap-1 px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full text-xs font-medium text-gray-700 transition-colors mt-1"
-            >
-              <PrivacyIcon className="w-3 h-3" />
-              <span>{text(PRIVACY_CONFIG[privacy].label, PRIVACY_CONFIG[privacy].labelEn)}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="px-4 pb-4 max-h-96 overflow-y-auto">
-          <textarea
-            value={postText}
-            onChange={(e) => setPostText(e.target.value)}
-            placeholder={text("Bạn đang nghĩ gì?", "What are you thinking?")}
-            className="w-full px-4 py-3 text-lg resize-none focus:outline-none min-h-32"
-            autoFocus
-          />
-
-          {(selectedMood || locationDraft.trim()) ? (
-            <div className="flex flex-wrap gap-2 px-1 text-sm">
-              {selectedMood ? (
-                <button
-                  type="button"
-                  onClick={() => setSelectedMood("")}
-                  className="rounded-full bg-yellow-50 px-3 py-1 font-medium text-yellow-700"
-                >
-                  {text("Đang cảm thấy", "Feeling")} {selectedMoodLabel} ×
-                </button>
-              ) : null}
-              {locationDraft.trim() ? (
-                <button
-                  type="button"
-                  onClick={() => setLocationDraft("")}
-                  className="rounded-full bg-red-50 px-3 py-1 font-medium text-red-700"
-                >
-                  {text("Tại", "At")} {locationDraft.trim()} ×
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-
-          {isMoodPickerOpen ? (
-            <div className="mt-3 flex flex-wrap gap-2 rounded-xl bg-gray-50 p-3">
-              {MOODS.map((mood) => (
-                <button
-                  key={mood.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedMood(mood.id);
-                    setIsMoodPickerOpen(false);
-                  }}
-                  className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-yellow-50 hover:text-yellow-700"
-                >
-                  {text(mood.label, mood.labelEn)}
-                </button>
-              ))}
-            </div>
-          ) : null}
-
-          {isLocationOpen ? (
-            <div className="mt-3 rounded-xl bg-gray-50 p-3">
-              <input
-                value={locationDraft}
-                onChange={(event) => setLocationDraft(event.target.value)}
-                placeholder={text("Thêm địa điểm", "Add location")}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
-              />
-            </div>
-          ) : null}
-
-          {/* Image Preview */}
-          {previewUrls.length > 0 ? (
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              {previewUrls.map((url, index) => (
-                <div key={url} className="relative group">
-                  {selectedFiles[index]?.type.startsWith("video/") ? (
-                    <video src={url} controls className="h-48 w-full rounded-lg bg-black object-cover" />
-                  ) : (
-                    <img
-                      src={url}
-                      alt={`Selected ${index + 1}`}
-                      className="w-full h-48 object-cover rounded-lg"
-                    />
-                  )}
-                  <button
-                    onClick={() => handleRemoveImage(index)}
-                    className="absolute top-2 right-2 p-1.5 bg-white hover:bg-gray-100 rounded-full shadow-lg transition-all opacity-0 group-hover:opacity-100"
-                  >
-                    <X className="w-4 h-4 text-gray-700" />
-                  </button>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-md p-8 relative z-10"
+      >
+        <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/50 p-8">
+          <h2 className="text-2xl font-bold text-center mb-6">
+            {step === 1 ? text("Quên mật khẩu", "Forgot password") : text("Xác nhận mã OTP", "Verify OTP")}
+          </h2>  
+          
+          {error && <p className="text-red-500 text-sm mb-4 text-center">{error}</p>}
+          
+          {/* GIAO DIỆN BƯỚC 1: NHẬP SĐT / EMAIL */}
+          {step === 1 && (
+            <form onSubmit={handleSendRequest} className="space-y-4">
+              <div> 
+                <label className="block text-sm font-medium text-gray-700 mb-1">{text("Email hoặc Số điện thoại", "Email or phone number")}</label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    required
+                    value={account}
+                    onChange={(e) => setAccount(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 bg-white/50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all"
+                    placeholder={text("VD: 0987654321 hoặc email@gmail.com", "e.g. 0987654321 or email@gmail.com")}
+                  />
                 </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
-
-        {/* Hidden file input */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept="image/*,video/*"
-          onChange={handleFileChange}
-          className="hidden"
-        />
-
-        {/* Add to Post */}
-        <div className="px-4 py-3 border-t border-gray-200">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">
-              {text("Thêm vào bài viết", "Add to your post")}
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={handleImageSelect}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors group"
-                title={text("Thêm ảnh/video", "Add photo/video")}
-              >
-                <ImageIcon className="w-6 h-6 text-green-500 group-hover:scale-110 transition-transform" />
+              </div>
+              
+              <button type="submit" className="w-full flex items-center justify-center gap-2 bg-gradient-to-br from-purple-600 to-blue-600 text-white py-3 rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 transition-colors">
+                {text("Gửi mã xác nhận", "Send verification code")}
               </button>
-              <button
-                onClick={() => {
-                  setIsMoodPickerOpen((value) => !value);
-                  setIsLocationOpen(false);
-                }}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors group"
-                title={text("Thêm cảm xúc", "Add feeling")}
-              >
-                <Smile className="w-6 h-6 text-yellow-500 group-hover:scale-110 transition-transform" />
-              </button>
-              <button
-                onClick={() => {
-                  setIsLocationOpen((value) => !value);
-                  setIsMoodPickerOpen(false);
-                }}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors group"
-                title={text("Thêm vị trí", "Add location")}
-              >
-                <MapPin className="w-6 h-6 text-red-500 group-hover:scale-110 transition-transform" />
-              </button>
-            </div>
-          </div>
-        </div>
+            </form>
+          )}
 
-        {/* Footer */}
-        <div className="p-4 border-t border-gray-200">
-          <button
-            onClick={handlePost}
-            disabled={
-              (!postText.trim() &&
-                !selectedMood &&
-                !locationDraft.trim() &&
-                selectedFiles.length === 0) ||
-              isSubmitting
-            }
-            className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                {text("Đang đăng...", "Posting...")}
-              </>
+          {/* GIAO DIỆN BƯỚC 2: NHẬP OTP & MẬT KHẨU MỚI */}
+          {step === 2 && (
+            <form onSubmit={handleVerifyAndReset} className="space-y-4">
+              <p className="text-sm text-gray-600 text-center mb-4">
+                {text("Mã OTP (6 số) đã được gửi đến", "The 6-digit OTP was sent to")} <br/><span className="font-bold text-purple-600">{account}</span>
+              </p>
+
+              <div> 
+                <label className="block text-sm font-medium text-gray-700 mb-1">{text("Mã OTP", "OTP code")}</label>
+                <div className="relative">
+                  <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 bg-white/50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all text-center tracking-[0.5em] font-bold"
+                    placeholder="------"
+                  />
+                </div>
+              </div>
+
+              <div> 
+                <label className="block text-sm font-medium text-gray-700 mb-1">{text("Mật khẩu mới", "New password")}</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="password"
+                    required
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 bg-white/50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all"
+                    placeholder={text("Nhập mật khẩu mới", "Enter new password")}
+                  />
+                </div>
+              </div>
+              
+              <button type="submit" className="w-full flex items-center justify-center gap-2 bg-gradient-to-br from-purple-600 to-blue-600 text-white py-3 rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 transition-colors">
+                {text("Đổi mật khẩu", "Change password")}
+              </button>
+            </form>
+          )}
+
+          <div className="mt-6 text-center">
+            {/* Nếu đang ở bước 2 thì hiện nút quay lại bước 1, còn ở bước 1 thì quay lại Login */}
+            {step === 2 ? (
+               <button onClick={() => setStep(1)} className="text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors">
+                 {text("Quay lại nhập số điện thoại", "Back to account entry")}
+               </button>
             ) : (
-              text("Đăng bài", "Post")
+               <Link to="/login" className="text-sm font-semibold text-purple-600 hover:text-purple-700 transition-colors">
+                 {text("Quay lại đăng nhập", "Back to login")}
+               </Link>
             )}
-          </button>
-        </div>
-      </div>
+          </div>
 
-      <style>{`
-        @keyframes scale-in {
-          from {
-            opacity: 0;
-            transform: scale(0.9);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
-        .animate-scale-in {
-          animation: scale-in 0.2s ease-out;
-        }
-      `}</style>
+        </div>
+      </motion.div>
     </div>
   );
 }

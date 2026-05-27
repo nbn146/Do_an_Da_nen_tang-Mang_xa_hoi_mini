@@ -1,168 +1,197 @@
-import { useEffect } from "react";
-import {
-  Bell,
-  Home,
-  MessageCircle,
-  PlusSquare,
-  Search,
-  Settings,
-  User,
-} from "lucide-react";
-import { useNotifications } from "../../hooks/useNotifications";
-import { useConversations } from "../../hooks/useConversations";
+import { Heart, MessageCircle, UserPlus, AtSign, Share2, Clock, Check, CheckCheck, Loader2 } from "lucide-react";
+import { useNotifications, type INotification } from "../../hooks/useNotifications";
 import { useLangText } from "../../hooks/useLangText";
-import { connectSocket } from "../../services/socketService";
 
-type ViewType =
-  | "feed"
-  | "profile"
-  | "notifications"
-  | "messages"
-  | "search"
-  | "settings";
+const getNotificationIcon = (type: INotification["type"]) => {
+  switch (type) {
+    case "like":
+      return <Heart className="w-5 h-5 text-red-500 fill-red-500" />;
+    case "comment":
+      return <MessageCircle className="w-5 h-5 text-blue-500" />;
+    case "follow":
+      return <UserPlus className="w-5 h-5 text-purple-500" />;
+    case "mention":
+      return <AtSign className="w-5 h-5 text-green-500" />;
+    case "share":
+      return <Share2 className="w-5 h-5 text-orange-500" />;
+    default:
+      return <Heart className="w-5 h-5 text-gray-500" />;
+  }
+};
 
-interface NavigationProps {
-  onViewChange: (view: ViewType) => void;
-  activeView: ViewType;
-  onCreatePost: () => void;
+const getNotificationText = (type: INotification["type"], text: (vi: string, en: string) => string) => {
+  switch (type) {
+    case "like":
+      return text("đã thích bài viết của bạn", "liked your post");
+    case "comment":
+      return text("đã bình luận bài viết của bạn", "commented on your post");
+    case "follow":
+      return text("đã bắt đầu theo dõi bạn", "started following you");
+    case "mention":
+      return text("đã nhắc đến bạn", "mentioned you");
+    case "share":
+      return text("đã chia sẻ bài viết của bạn", "shared your post");
+    default:
+      return text("đã tương tác với bạn", "interacted with you");
+  }
+};
+
+/**
+ * Tính thời gian tương đối từ timestamp.
+ */
+function timeAgo(dateStr: string, text: (vi: string, en: string) => string): string {
+  const now = Date.now();
+  const diff = now - new Date(dateStr).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return text("Vừa xong", "Just now");
+  if (minutes < 60) return text(`${minutes} phút trước`, `${minutes} minutes ago`);
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return text(`${hours} giờ trước`, `${hours} hours ago`);
+  const days = Math.floor(hours / 24);
+  if (days < 7) return text(`${days} ngày trước`, `${days} days ago`);
+  return new Date(dateStr).toLocaleDateString(text("vi-VN", "en-US"));
 }
 
-export function Navigation({
-  onViewChange,
-  activeView,
-  onCreatePost,
-}: NavigationProps) {
-  const { unreadCount } = useNotifications();
-  const { conversations } = useConversations();
+export function NotificationsView() {
   const text = useLangText();
-  const unreadMessageCount = conversations.reduce(
-    (total, conversation) => total + (conversation.unreadCount || 0),
-    0,
-  );
+  const { notifications, isLoading, error, unreadCount, markAsRead, markAllAsRead } = useNotifications();
 
-  useEffect(() => {
-    connectSocket();
-  }, []);
-
-  return (
-    <nav className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 shadow-sm sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          <div className="flex items-center space-x-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
-              <span className="text-white text-xl font-bold">S</span>
-            </div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent hidden sm:block">
-              Social Mini
-            </h1>
-          </div>
-
-          <div className="hidden md:flex flex-1 max-w-md mx-8">
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder={text("Tìm kiếm...", "Search...")}
-                onFocus={() => onViewChange("search")}
-                className="w-full pl-10 pr-4 py-2 bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all cursor-pointer"
-                readOnly
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-1 sm:space-x-2">
-            <button
-              onClick={() => onViewChange("feed")}
-              className={`p-2 rounded-lg transition-all ${
-                activeView === "feed"
-                  ? "bg-purple-100 text-purple-600"
-                  : "hover:bg-gray-100 text-gray-600"
-              }`}
-              title={text("Trang chủ", "Home")}
-            >
-              <Home className="w-6 h-6" />
-            </button>
-
-            <button
-              onClick={() => onViewChange("search")}
-              className={`p-2 rounded-lg transition-all md:hidden ${
-                activeView === "search"
-                  ? "bg-purple-100 text-purple-600"
-                  : "hover:bg-gray-100 text-gray-600"
-              }`}
-              title={text("Tìm kiếm", "Search")}
-            >
-              <Search className="w-6 h-6" />
-            </button>
-
-            <button
-              onClick={() => onViewChange("messages")}
-              className={`p-2 rounded-lg transition-all relative ${
-                activeView === "messages"
-                  ? "bg-purple-100 text-purple-600"
-                  : "hover:bg-gray-100 text-gray-600"
-              }`}
-              title={text("Tin nhắn", "Messages")}
-            >
-              <MessageCircle className="w-6 h-6" />
-              {unreadMessageCount > 0 ? (
-                <span className="absolute top-1 right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs text-white">
-                  {unreadMessageCount > 99 ? "99+" : unreadMessageCount}
-                </span>
-              ) : null}
-            </button>
-
-            <button
-              onClick={onCreatePost}
-              className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-all"
-              title={text("Tạo bài viết", "Create post")}
-            >
-              <PlusSquare className="w-6 h-6" />
-            </button>
-
-            <button
-              onClick={() => onViewChange("notifications")}
-              className={`p-2 rounded-lg transition-all relative ${
-                activeView === "notifications"
-                  ? "bg-purple-100 text-purple-600"
-                  : "hover:bg-gray-100 text-gray-600"
-              }`}
-              title={text("Thông báo", "Notifications")}
-            >
-              <Bell className="w-6 h-6" />
-              {unreadCount > 0 ? (
-                <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </span>
-              ) : null}
-            </button>
-
-            <button
-              onClick={() => onViewChange("profile")}
-              className={`p-2 rounded-lg transition-all ${
-                activeView === "profile"
-                  ? "bg-purple-100 text-purple-600"
-                  : "hover:bg-gray-100 text-gray-600"
-              }`}
-              title={text("Trang cá nhân", "Profile")}
-            >
-              <User className="w-6 h-6" />
-            </button>
-
-            <button
-              onClick={() => onViewChange("settings")}
-              className={`p-2 rounded-lg transition-all ${
-                activeView === "settings"
-                  ? "bg-purple-100 text-purple-600"
-                  : "hover:bg-gray-100 text-gray-600"
-              }`}
-              title={text("Cài đặt", "Settings")}
-            >
-              <Settings className="w-6 h-6" />
-            </button>
-          </div>
+  if (isLoading) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-12 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
+          <span className="ml-3 text-gray-500">{text("Đang tải thông báo...", "Loading notifications...")}</span>
         </div>
       </div>
-    </nav>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-12 text-center">
+          <p className="text-red-500">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg overflow-hidden">
+        {/* Header */}
+        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+              {text("Thông báo", "Notifications")}
+            </h2>
+            {unreadCount > 0 ? (
+              <p className="text-sm text-gray-500 mt-1">
+                {unreadCount} {text("chưa đọc", "unread")}
+              </p>
+            ) : null}
+          </div>
+          {unreadCount > 0 ? (
+            <button
+              onClick={markAllAsRead}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+            >
+              <CheckCheck className="w-4 h-4" />
+              {text("Đánh dấu tất cả đã đọc", "Mark all as read")}
+            </button>
+          ) : null}
+        </div>
+
+        {/* Notifications List */}
+        {notifications.length === 0 ? (
+          <div className="p-12 text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-purple-100 to-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Heart className="w-8 h-8 text-purple-400" />
+            </div>
+            <p className="text-gray-500 font-medium">{text("Chưa có thông báo nào", "No notifications yet")}</p>
+            <p className="text-sm text-gray-400 mt-1">
+              {text("Khi có người tương tác, bạn sẽ thấy ở đây", "When someone interacts with you, you will see it here")}
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {notifications.map((notification) => {
+              // Lấy thông tin sender (có thể là object hoặc string)
+              const sender = typeof notification.sender_id === "object"
+                ? notification.sender_id
+                : null;
+              const senderName = sender?.display_name || sender?.username || text("Ai đó", "Someone");
+              const senderAvatar = sender?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(senderName)}&background=7c3aed&color=fff`;
+
+              return (
+                <div
+                  key={notification._id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    if (!notification.is_read) {
+                      markAsRead(notification._id);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      if (!notification.is_read) {
+                        markAsRead(notification._id);
+                      }
+                    }
+                  }}
+                  className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer ${
+                    !notification.is_read ? "bg-purple-50/50" : ""
+                  }`}
+                >
+                  <div className="flex gap-3">
+                    {/* Avatar with notification icon */}
+                    <div className="relative flex-shrink-0">
+                      <img
+                        src={senderAvatar}
+                        alt={senderName}
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                      <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-1 shadow-md">
+                        {getNotificationIcon(notification.type)}
+                      </div>
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <p className="text-sm">
+                            <span className="font-semibold text-gray-900">
+                              {senderName}
+                            </span>{" "}
+                            <span className="text-gray-600">
+                              {notification.content || getNotificationText(notification.type, text)}
+                            </span>
+                          </p>
+                          <div className="flex items-center gap-1 mt-1 text-xs text-gray-500">
+                            <Clock className="w-3 h-3" />
+                            <span>{timeAgo(notification.createdAt, text)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Read indicator */}
+                    {!notification.is_read ? (
+                      <div className="w-2.5 h-2.5 bg-purple-600 rounded-full flex-shrink-0 mt-2"></div>
+                    ) : (
+                      <Check className="w-4 h-4 text-gray-300 flex-shrink-0 mt-2" />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

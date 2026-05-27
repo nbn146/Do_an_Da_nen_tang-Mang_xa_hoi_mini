@@ -7,7 +7,7 @@ import { successResponse, errorResponse } from "../utils/response.js";
 import otpModels from "../models/otpModels.js";
 import { env } from "../config/env.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_key";
+
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // ─────────────────────────────────────────────
@@ -50,6 +50,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         "auth.USER_ALREADY_EXISTS",
         400,
         "USER_ALREADY_EXISTS",
+        { phone: phone_number }
       );
       return;
     }
@@ -310,7 +311,10 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     const user = await User.findOne({
-      $or: [{ email: account }, { phone_number: account }],
+      $or: [
+        { email: account },
+        { phone_number: account },
+      ],
     });
 
     if (!user) {
@@ -334,6 +338,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       {
         token,
         user: {
+          _id: user._id,
           id: user._id,
           username: user.username,
           display_name: user.display_name,
@@ -431,7 +436,7 @@ export const googleLogin = async (
       await user.save();
     }
 
-    const token = jwt.sign({ userId: user._id }, JWT_SECRET, {
+    const token = jwt.sign({ userId: user._id }, env.jwtSecret, {
       expiresIn: "7d",
     });
 
@@ -441,6 +446,7 @@ export const googleLogin = async (
       {
         token,
         user: {
+          _id: user._id,
           id: user._id,
           username: user.username,
           display_name: user.display_name,
