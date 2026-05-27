@@ -8,10 +8,18 @@ import {
   Settings,
   User,
 } from "lucide-react";
+<<<<<<< Updated upstream
 import { useNotifications } from "../../hooks/useNotifications";
 import { useConversations } from "../../hooks/useConversations";
 import { useLangText } from "../../hooks/useLangText";
 import { connectSocket } from "../../services/socketService";
+=======
+import { toast } from "sonner";
+import { copyText } from "./utils/share";
+import { useConversations, useMessages } from "./hooks/useConversations";
+import { useCurrentUser } from "./hooks/useCurrentUser";
+import { useLangText } from "./hooks/useLangText";
+>>>>>>> Stashed changes
 
 type ViewType =
   | "feed"

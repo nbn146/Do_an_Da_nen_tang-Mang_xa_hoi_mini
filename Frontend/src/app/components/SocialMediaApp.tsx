@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Navigation } from "./Navigation";
 import { PostFeed } from "./PostFeed";
 import { Sidebar } from "./Sidebar";
@@ -9,29 +10,103 @@ import { MessagesView } from "./MessagesView";
 import { SearchView } from "./SearchView";
 import { SettingsView } from "./SettingsView";
 import { CreatePostModal } from "./CreatePostModal";
+import { getValidToken } from "../../hooks/useCurrentUser";
 
-type ViewType = "feed" | "profile" | "notifications" | "messages" | "search" | "settings";
+type ViewType =
+  | "feed"
+  | "profile"
+  | "notifications"
+  | "messages"
+  | "search"
+  | "settings";
 
 export function SocialMediaApp() {
+  const navigate = useNavigate();
   const [activeView, setActiveView] = useState<ViewType>("feed");
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
+  const [postRefreshKey, setPostRefreshKey] = useState(0);
+  const [selectedConversationId, setSelectedConversationId] = useState<
+    string | null
+  >(null);
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+  const [focusedPostId, setFocusedPostId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!getValidToken()) {
+      navigate("/login", { replace: true });
+    }
+  }, [navigate]);
+
+  const handleViewChange = (view: ViewType) => {
+    setIsCreatePostOpen(false);
+    if (view !== "profile") setSelectedProfileId(null);
+    setFocusedPostId(null);
+    setActiveView(view);
+  };
+
+  const handleOpenProfile = (userId?: string | null) => {
+    setIsCreatePostOpen(false);
+    setSelectedProfileId(userId || null);
+    setActiveView("profile");
+  };
+
+  const handleOpenPost = (postId: string) => {
+    setIsCreatePostOpen(false);
+    setSelectedProfileId(null);
+    setFocusedPostId(postId);
+    setActiveView("feed");
+  };
 
   const renderMainContent = () => {
     switch (activeView) {
       case "feed":
-        return <PostFeed />;
+        return (
+          <PostFeed
+            refreshKey={postRefreshKey}
+            onCreatePost={() => setIsCreatePostOpen(true)}
+            onOpenProfile={handleOpenProfile}
+            focusedPostId={focusedPostId}
+          />
+        );
       case "profile":
-        return <ProfileView />;
+        return (
+          <ProfileView
+            userId={selectedProfileId}
+            onEditProfile={() => handleViewChange("settings")}
+            onOpenProfile={handleOpenProfile}
+          />
+        );
       case "notifications":
-        return <NotificationsView />;
+        return (
+          <NotificationsView
+            onOpenPost={handleOpenPost}
+            onOpenProfile={handleOpenProfile}
+          />
+        );
       case "messages":
-        return <MessagesView />;
+        return <MessagesView initialConversationId={selectedConversationId} />;
       case "search":
-        return <SearchView />;
+        return (
+          <SearchView
+            onOpenProfile={handleOpenProfile}
+            onOpenPost={() => handleViewChange("feed")}
+            onStartConversation={(conversationId) => {
+              setSelectedConversationId(conversationId);
+              handleViewChange("messages");
+            }}
+          />
+        );
       case "settings":
-        return <SettingsView />;
+        return <SettingsView onViewChange={handleViewChange} />;
       default:
-        return <PostFeed />;
+        return (
+          <PostFeed
+            refreshKey={postRefreshKey}
+            onCreatePost={() => setIsCreatePostOpen(true)}
+            onOpenProfile={handleOpenProfile}
+            focusedPostId={focusedPostId}
+          />
+        );
     }
   };
 
@@ -48,7 +123,7 @@ export function SocialMediaApp() {
       {/* Content */}
       <div className="relative z-10 size-full flex flex-col">
         <Navigation
-          onViewChange={setActiveView}
+          onViewChange={handleViewChange}
           activeView={activeView}
           onCreatePost={() => setIsCreatePostOpen(true)}
         />
@@ -59,7 +134,7 @@ export function SocialMediaApp() {
               <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr_300px] gap-6 h-full">
                 {/* Left Sidebar - Profile Card */}
                 <div className="hidden lg:block">
-                  <ProfileCard />
+                  <ProfileCard onEditProfile={() => handleViewChange("settings")} />
                 </div>
 
                 {/* Main Content */}
@@ -69,7 +144,10 @@ export function SocialMediaApp() {
 
                 {/* Right Sidebar */}
                 <div className="hidden lg:block">
-                  <Sidebar />
+                  <Sidebar
+                    onViewAllSuggestions={() => setActiveView("search")}
+                    onOpenProfile={handleOpenProfile}
+                  />
                 </div>
               </div>
             ) : (
@@ -85,6 +163,7 @@ export function SocialMediaApp() {
       <CreatePostModal
         isOpen={isCreatePostOpen}
         onClose={() => setIsCreatePostOpen(false)}
+        onPostCreated={() => setPostRefreshKey((value) => value + 1)}
       />
     </div>
   );
