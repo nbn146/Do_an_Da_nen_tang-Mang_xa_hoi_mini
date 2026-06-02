@@ -10,7 +10,7 @@ import {
   Loader2,
 } from "lucide-react";
 import apiClient from "../../services/api";
-import { useCurrentUser } from "../../hooks/useCurrentUser";
+import { useCurrentUser } from "../../hooks/useCurrentUser.ts";
 import { useLangText } from "../../hooks/useLangText";
 
 interface CreatePostModalProps {

@@ -7,6 +7,7 @@
     "i18next": "^26.0.8",
     "i18next-http-middleware": "^3.9.6",
     "jsonwebtoken": "^9.0.3",
+    "jwt-decode": "^4.0.0",
     "mongoose": "^9.5.0",
     "sonner": "^2.0.7"
   },

@@ -4,10 +4,10 @@ import { toast } from "sonner";
 import { PostCard } from "./PostCard";
 import { CreatePostModal } from "./CreatePostModal";
 import apiClient from "../../services/api";
-import { useCurrentUser } from "../../hooks/useCurrentUser";
+import { useCurrentUser } from "../../hooks/useCurrentUser.ts/index.ts";
 import { useLangText } from "../../hooks/useLangText";
-import { sharePostLink } from "../../utils/share";
-import type { IPost } from "../../types/models";
+import { sharePostLink } from "../../utils/share.ts/index.ts";
+import type { IPost } from "../../types/models.ts";
 
 interface PostFeedProps {
   onCreatePost?: () => void;
