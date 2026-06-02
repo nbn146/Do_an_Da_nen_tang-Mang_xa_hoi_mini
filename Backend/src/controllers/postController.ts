@@ -4,10 +4,7 @@ import PostModel from "../models/postModel.js";
 import Reaction from "../models/Reaction.js";
 import { uploadAndCompressImage, uploadRawFile } from "../services/minioService.js";
 import { successResponse, errorResponse } from "../utils/response.js";
-<<<<<<< Updated upstream
-=======
 import { getVisibilityFilter } from "../utils/visibilityFilter.js";
->>>>>>> Stashed changes
 
 function extractHashtags(text: string): string[] {
   if (!text) return [];
@@ -136,11 +133,7 @@ export const sharePost = async (req: Request, res: Response): Promise<void> => {
 export const getNewsfeed = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).userId as string | undefined;
-<<<<<<< Updated upstream
-    const posts = await PostModel.find({ visibility: { $ne: "private" } })
-=======
     const posts = await PostModel.find({ visibility: "public" })
->>>>>>> Stashed changes
       .sort({ created_at: -1 })
       .populate("author_id", "username display_name avatar_url")
       .lean();
@@ -159,39 +152,25 @@ export const getNewsfeed = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-<<<<<<< Updated upstream
-export const updatePost = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = (req as any).userId as string;
-    const { postId } = req.params as { postId: string };
-    const { content, visibility } = req.body;
-=======
 export const getPostById = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).userId as string | undefined;
     const { postId } = req.params as { postId: string };
->>>>>>> Stashed changes
 
     if (!mongoose.Types.ObjectId.isValid(postId)) {
       errorResponse(req, res, "post.INVALID_ID", 400, "INVALID_ID");
       return;
     }
 
-<<<<<<< Updated upstream
-    const post = await PostModel.findById(postId);
-=======
     const post = await PostModel.findById(postId)
       .populate("author_id", "username display_name avatar_url")
       .lean();
 
->>>>>>> Stashed changes
     if (!post) {
       errorResponse(req, res, "post.NOT_FOUND", 404, "NOT_FOUND");
       return;
     }
 
-<<<<<<< Updated upstream
-=======
     const authorId =
       typeof post.author_id === "object" && post.author_id
         ? String((post.author_id as any)._id)
@@ -238,7 +217,6 @@ export const updatePost = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
->>>>>>> Stashed changes
     if (post.author_id.toString() !== userId) {
       errorResponse(req, res, "post.NOT_AUTHOR", 403, "NOT_AUTHOR");
       return;
