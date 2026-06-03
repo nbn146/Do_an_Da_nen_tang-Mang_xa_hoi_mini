@@ -9,6 +9,45 @@ interface AuthRequest extends Request {
   userId?: string;
 }
 
+export const getPostLikes = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { postId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(postId)) {
+      errorResponse(req, res, "post.INVALID_ID", 400, "INVALID_ID");
+      return;
+    }
+
+    // Find all 'like' reactions for the post
+    const reactions = await Reaction.find({
+      post_id: new mongoose.Types.ObjectId(postId),
+      type: "like",
+    })
+      .populate("user_id", "username display_name avatar_url")
+      .sort({ created_at: -1 })
+      .lean();
+
+    const likers = reactions
+      .map((reaction: any) => reaction.user_id)
+      .filter(Boolean); // Filter out nulls if user deleted
+
+    successResponse(
+      req,
+      res,
+      { likers },
+      "post.GET_LIKES_SUCCESS",
+      200,
+      "GET_LIKES_SUCCESS",
+    );
+  } catch (error: any) {
+    console.error("Error in getPostLikes:", error);
+    errorResponse(req, res, "common.SERVER_ERROR", 500, "SERVER_ERROR");
+  }
+};
+
 export const reactToPost = async (
   req: AuthRequest,
   res: Response,

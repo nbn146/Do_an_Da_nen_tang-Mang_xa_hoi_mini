@@ -3,6 +3,7 @@ dotenv.config();
 
 const minioEndpoint = process.env.MINIO_ENDPOINT || "localhost";
 const minioPort = parseInt(process.env.MINIO_PORT || "9000");
+const minioUseSSL = (process.env.MINIO_USE_SSL || "false").toLowerCase() === "true";
 const googleClientIds = [
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_ANDROID_CLIENT_ID,
@@ -17,6 +18,7 @@ export const env = {
   googleClientIds,
   minioEndpoint,
   minioPort,
+  minioUseSSL,
   minioPublicUrl: (process.env.MINIO_PUBLIC_URL || `http://${minioEndpoint}:${minioPort}`).replace(/\/+$/, ""),
   minioAccessKey: process.env.MINIO_ACCESS_KEY || "admin",
   minioSecretKey: process.env.MINIO_SECRET_KEY || "password123",

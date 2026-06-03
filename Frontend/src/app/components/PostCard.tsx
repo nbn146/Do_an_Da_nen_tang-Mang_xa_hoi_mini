@@ -1,4 +1,5 @@
 import { useState, useCallback, memo } from "react";
+import { createPortal } from "react-dom";
 import {
   Ban,
   Bookmark,
@@ -79,6 +80,11 @@ export const PostCard = memo(function PostCard({
   const [showTools, setShowTools] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(post.content || "");
+  const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
+  
+  const [showLikersModal, setShowLikersModal] = useState(false);
+  const [likers, setLikers] = useState<IUser[]>([]);
+  const [isLoadingLikers, setIsLoadingLikers] = useState(false);
 
   const author = getUserInfo(post.author_id as IUser | string, text);
   const isOwner = Boolean(currentUser?._id && author.id === currentUser._id);
@@ -188,6 +194,20 @@ export const PostCard = memo(function PostCard({
   const handleShare = useCallback(() => {
     onShare(post._id);
   }, [onShare, post._id]);
+
+  const handleShowLikers = async () => {
+    try {
+      setIsLoadingLikers(true);
+      setShowLikersModal(true);
+      const res = await apiClient.get(`/post/${post._id}/likes`);
+      setLikers(res.data.data.likers || []);
+    } catch (error) {
+      console.error(error);
+      toast.error(text("Không thể tải danh sách người thích", "Could not load likers"));
+    } finally {
+      setIsLoadingLikers(false);
+    }
+  };
 
   const currentUserName = currentUser?.display_name || currentUser?.username || "U";
   const currentUserAvatar =
@@ -323,7 +343,12 @@ export const PostCard = memo(function PostCard({
                 post.original_post_id.media[0].type === "video" ? (
                   <video src={post.original_post_id.media[0].url} controls className="w-full max-h-[400px] bg-black" />
                 ) : (
-                  <img src={post.original_post_id.media[0].url} alt={post.original_post_id.media[0].alt_text || "Post content"} className="w-full object-cover max-h-[400px]" />
+                  <img 
+                    src={post.original_post_id.media[0].url} 
+                    alt={post.original_post_id.media[0].alt_text || "Post content"} 
+                    className="w-full object-cover max-h-[400px] cursor-pointer" 
+                    onClick={(e) => { e.stopPropagation(); setFullScreenImage(post.original_post_id.media[0].url); }}
+                  />
                 )
               ) : (
                 <div className="grid grid-cols-2 gap-1">
@@ -352,7 +377,12 @@ export const PostCard = memo(function PostCard({
             post.media[0].type === "video" ? (
               <video src={resolveMediaUrl(post.media[0].url)} controls className="w-full max-h-[500px] bg-black" />
             ) : (
-              <img src={resolveMediaUrl(post.media[0].url)} alt={post.media[0].alt_text || "Post content"} className="w-full object-cover max-h-[500px]" />
+              <img 
+                src={resolveMediaUrl(post.media[0].url)} 
+                alt={post.media[0].alt_text || "Post content"} 
+                className="w-full object-cover max-h-[500px] cursor-pointer"
+                onClick={(e) => { e.stopPropagation(); setFullScreenImage(resolveMediaUrl(post.media[0].url)); }}
+              />
             )
           ) : (
             <div className="grid grid-cols-2 gap-1">
@@ -369,7 +399,12 @@ export const PostCard = memo(function PostCard({
       ) : null}
 
       <div className="px-4 py-3 flex items-center justify-between text-sm text-gray-600">
-        <span>{post.stats.likes} {text("lượt thích", "likes")}</span>
+        <span 
+          onClick={() => { if (post.stats.likes > 0) void handleShowLikers(); }}
+          className={post.stats.likes > 0 ? "cursor-pointer hover:underline" : ""}
+        >
+          {post.stats.likes} {text("lượt thích", "likes")}
+        </span>
         <div className="flex items-center space-x-4">
           <span>{post.stats.comments} {text("bình luận", "comments")}</span>
           <span>{post.stats.shares} {text("chia sẻ", "shares")}</span>
@@ -462,6 +497,80 @@ export const PostCard = memo(function PostCard({
           )}
         </div>
       ) : null}
+
+      {fullScreenImage && typeof document !== 'undefined' && createPortal(
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+          onClick={() => setFullScreenImage(null)}
+        >
+          <button 
+            className="absolute top-4 right-4 p-2 text-white bg-black/50 rounded-full hover:bg-white/20 transition-colors"
+            onClick={() => setFullScreenImage(null)}
+          >
+            <X className="w-6 h-6" />
+          </button>
+          <img 
+            src={fullScreenImage} 
+            alt="Full screen" 
+            className="w-auto h-auto max-w-[100vw] max-h-[100vh] object-contain"
+            onClick={(e) => e.stopPropagation()} 
+          />
+        </div>,
+        document.body
+      )}
+
+      {showLikersModal && typeof document !== 'undefined' && createPortal(
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowLikersModal(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl w-[90%] max-w-md max-h-[80vh] flex flex-col shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="font-semibold text-lg">{text("Lượt thích", "Likes")}</h3>
+              <button 
+                onClick={() => setShowLikersModal(false)}
+                className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            
+            <div className="overflow-y-auto p-4 space-y-4">
+              {isLoadingLikers ? (
+                <div className="text-center py-4 text-gray-500">{text("Đang tải...", "Loading...")}</div>
+              ) : likers.length === 0 ? (
+                <div className="text-center py-4 text-gray-500">{text("Chưa có lượt thích nào", "No likes yet")}</div>
+              ) : (
+                likers.map((user) => (
+                  <div key={user._id} className="flex items-center justify-between">
+                    <div 
+                      className="flex items-center space-x-3 cursor-pointer"
+                      onClick={() => {
+                        setShowLikersModal(false);
+                        if (user._id) onOpenProfile?.(user._id);
+                      }}
+                    >
+                      <img 
+                        src={resolveMediaUrl(user.avatar_url) || `https://ui-avatars.com/api/?name=${user.username}`} 
+                        alt={user.display_name || user.username} 
+                        className="w-10 h-10 rounded-full object-cover"
+                      />
+                      <div>
+                        <div className="font-semibold text-gray-900">{user.display_name || user.username}</div>
+                        <div className="text-xs text-gray-500">@{user.username}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 });

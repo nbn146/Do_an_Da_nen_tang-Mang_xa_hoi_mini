@@ -40,6 +40,7 @@ export const ENDPOINTS = {
   UPDATE_POST: (postId: string) => `/post/${postId}`,
   DELETE_POST: (postId: string) => `/post/${postId}`,
   REACT_POST: (postId: string) => `/post/${postId}/react`,
+  POST_LIKES: (postId: string) => `/post/${postId}/likes`,
   SHARE_POST: (postId: string) => `/post/${postId}/share`,
 
   // Comments

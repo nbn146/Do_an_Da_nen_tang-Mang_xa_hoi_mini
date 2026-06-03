@@ -11,6 +11,7 @@ import { useLanguage } from "../store/LanguageContext";
 import { useSocketContext } from "../store/SocketContext";
 import type { INotification, IUser } from "../types/models";
 import { useNavigation } from "@react-navigation/native";
+import { resolveMediaUrl } from "../utils/media";
 
 const FlashListAny = FlashList as any;
 
@@ -37,7 +38,6 @@ const getNotificationText = (type: string, t: (vi: string, en: string) => string
 export default function NotificationsScreen({ navigation }: any) {
   const { t } = useLanguage();
   const { socket } = useSocketContext();
-  const navigation: any = useNavigation();
   const [notifications, setNotifications] = useState<INotification[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -129,7 +129,9 @@ export default function NotificationsScreen({ navigation }: any) {
   const renderItem = useCallback(({ item }: { item: INotification }) => {
     const sender = (typeof item.sender_id === "object" ? item.sender_id : null) as IUser | null;
     const senderName = sender?.display_name || sender?.username || t("Ai đó", "Someone");
-    const senderAvatar = sender?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(senderName)}&background=7c3aed&color=fff`;
+    const senderAvatar = 
+      (sender?.avatar_url ? resolveMediaUrl(sender.avatar_url) : null) || 
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(senderName)}&background=7c3aed&color=fff`;
 
     const handlePress = async () => {
       try {

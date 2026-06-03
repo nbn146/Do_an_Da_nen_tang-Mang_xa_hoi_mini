@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import { createPost, deletePost, getNewsfeed, getPostById, sharePost, repostPost, updatePost } from '../controllers/postController.js';
-import { reactToPost } from '../controllers/reactionController.js';
+import { reactToPost, getPostLikes } from '../controllers/reactionController.js';
 import { getPersonalFeed } from '../controllers/feedController.js';
 import { createComment, getComments, getReplies, deleteComment } from '../controllers/commentController.js';
 import { verifyToken } from '../middleware/authMiddleware.js';
@@ -28,6 +28,9 @@ router.delete('/:postId', verifyToken, deletePost);
 
 // POST /api/post/:postId/react — Like/react bài viết
 router.post('/:postId/react', verifyToken, reactToPost);
+
+// GET /api/post/:postId/likes — Lấy danh sách người đã like
+router.get('/:postId/likes', verifyToken, getPostLikes);
 
 // POST /api/post/:postId/share — Chia sẻ bài viết lên profile và tăng số lượt chia sẻ
 router.post('/:postId/share', verifyToken, sharePost);

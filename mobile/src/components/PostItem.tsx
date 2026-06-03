@@ -7,7 +7,8 @@ import {
   MoreHorizontal,
   Share2,
   Volume2, 
-  VolumeX
+  VolumeX,
+  X
 } from "lucide-react-native";
 import { useVideoPlayer, VideoView } from 'expo-video';
 import {
@@ -17,6 +18,9 @@ import {
   Text,
   TextInput,
   View,
+  Modal,
+  ScrollView,
+  ActivityIndicator,
 } from "react-native";
 
 import { Image } from "expo-image";
@@ -30,28 +34,9 @@ import { useAuth } from "../store/AuthContext";
 import { useLanguage } from "../store/LanguageContext";
 import { palette } from "../theme";
 import type { IComment, IPost, IUser } from "../types/models";
-import { BASE_URL } from "~/api/config";
+import { resolveMediaUrl } from "../utils/media";
 
-const getValidMediaUrl = (url?: string) => {
-  if (!url) return "";
-  let formattedUrl = url.replace(/\\/g, '/');
-  
-  // determine MinIO host based on app API host so developer doesn't need to hardcode
-  let MINIO_URL = "http://192.168.0.105:9000"; // fallback if parsing fails
-  try {
-    const parsed = new URL(BASE_URL);
-    MINIO_URL = `${parsed.protocol}//${parsed.hostname}:9000`;
-  } catch (e) {
-    // keep fallback
-  }
-
-  if (formattedUrl.includes("localhost") || formattedUrl.includes("127.0.0.1") || formattedUrl.includes(":3000")) {
-    formattedUrl = formattedUrl.replace(/http:\/\/[^/]+/g, MINIO_URL);
-  } else if (!formattedUrl.startsWith("http")) {
-    formattedUrl = `${MINIO_URL}${formattedUrl.startsWith('/') ? '' : '/'}${formattedUrl}`;
-  }
-  return formattedUrl;
-};
+// 3. THÊM HÀM NÀY ĐỂ NHẬN DIỆN VIDEO
 
 // 3. THÊM HÀM NÀY ĐỂ NHẬN DIỆN VIDEO
 const checkIsVideo = (url?: string) => {
@@ -79,12 +64,8 @@ const VideoPlayerItem = ({ url, isMuted, onToggleMute, hideMuteButton = false }:
         style={styles.mediaVideo}
         allowsFullscreen
         allowsPictureInPicture
+        nativeControls={true}
       />
-      {!hideMuteButton && onToggleMute && (
-        <Pressable style={styles.customMuteBtn} onPress={onToggleMute}>
-          {isMuted ? <VolumeX color="#fff" size={20} /> : <Volume2 color="#fff" size={20} />}
-        </Pressable>
-      )}
     </View>
   );
 };
@@ -115,6 +96,10 @@ function PostItem({ post, onRefresh, onOpenProfile }: Props) {
   const [isMuted, setIsMuted] = useState(false);
   const [isShareModalVisible, setIsShareModalVisible] = useState(false);
   const [token, setToken] = useState<string>("");
+  const [fullScreenImageUrl, setFullScreenImageUrl] = useState<string | null>(null);
+  const [showLikersModal, setShowLikersModal] = useState(false);
+  const [likers, setLikers] = useState<IUser[]>([]);
+  const [isLoadingLikers, setIsLoadingLikers] = useState(false);
 
   useEffect(() => {
     SecureStore.getItemAsync("token").then((t:any) => {
@@ -128,7 +113,7 @@ function PostItem({ post, onRefresh, onOpenProfile }: Props) {
   const isOwner = Boolean(author?._id && (user as any)?._id === author._id);
   const authorName = author?.display_name || author?.username || t("Người dùng", "User");
   const authorAvatar =
-    (author?.avatar_url ? getValidMediaUrl(author.avatar_url) : null) ||
+    (author?.avatar_url ? resolveMediaUrl(author.avatar_url) : null) ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=7c3aed&color=fff`;
 
   useEffect(() => {
@@ -165,6 +150,21 @@ function PostItem({ post, onRefresh, onOpenProfile }: Props) {
       console.error("[PostItem] Like error:", e);
     }
   }, [isLiked, likesCount, post._id]);
+
+  const handleShowLikers = useCallback(async () => {
+    if (likesCount === 0) return;
+    try {
+      setIsLoadingLikers(true);
+      setShowLikersModal(true);
+      const res = await api.get(ENDPOINTS.POST_LIKES(post._id));
+      setLikers(res.data.data.likers || []);
+    } catch (e) {
+      console.error("[PostItem] Load likers error:", e);
+      Alert.alert(t("Lỗi", "Error"), t("Không thể tải danh sách người thích.", "Could not load likers."));
+    } finally {
+      setIsLoadingLikers(false);
+    }
+  }, [likesCount, post._id, t]);
 
   const loadComments = useCallback(async () => {
     try {
@@ -323,8 +323,8 @@ function PostItem({ post, onRefresh, onOpenProfile }: Props) {
           style={styles.userInfoRow}
         >
           <Image
-            source={{ uri: getValidMediaUrl(authorAvatar) }}
-            style={styles.avatar}
+            source={{ uri: resolveMediaUrl(authorAvatar) }}
+            style={styles.avatarImage}
             contentFit="cover"
           />
           <View style={styles.nameContainer}>
@@ -395,8 +395,8 @@ function PostItem({ post, onRefresh, onOpenProfile }: Props) {
         >
           <View style={{ flexDirection: "row", alignItems: "center", padding: 12, borderBottomWidth: 1, borderBottomColor: palette.line, backgroundColor: "#fff" }}>
             <Image 
-              source={{ uri: getValidMediaUrl(post.original_post_id.author_id?.avatar_url) || `https://ui-avatars.com/api/?name=${post.original_post_id.author_id?.username || 'User'}` }} 
-              style={{ width: 24, height: 24, borderRadius: 12, marginRight: 8 }}
+              source={{ uri: resolveMediaUrl(post.original_post_id.author_id?.avatar_url) || `https://ui-avatars.com/api/?name=${post.original_post_id.author_id?.username || 'User'}` }} 
+              style={styles.repostAvatar} 
             />
             <Text style={{ fontWeight: "600", fontSize: 13, color: palette.ink }}>
               {post.original_post_id.author_id?.display_name || post.original_post_id.author_id?.username || "User"}
@@ -414,16 +414,18 @@ function PostItem({ post, onRefresh, onOpenProfile }: Props) {
             <View style={{ borderTopWidth: 1, borderTopColor: palette.line }}>
               {checkIsVideo(post.original_post_id.media[0].url) ? (
                 <VideoPlayerItem 
-                  url={getValidMediaUrl(post.original_post_id.media[0].url)} 
+                  url={resolveMediaUrl(post.original_post_id.media[0].url)} 
                   isMuted={isMuted} 
                   hideMuteButton={true} 
                 />
               ) : (
-                <Image
-                  source={{ uri: getValidMediaUrl(post.original_post_id.media[0].url) }}
-                  style={[styles.mediaImage, { height: 200 }]}
-                  contentFit="cover"
-                />
+                <Pressable onPress={() => setFullScreenImageUrl(resolveMediaUrl(post.original_post_id.media[0].url))}>
+                  <Image
+                    source={{ uri: resolveMediaUrl(post.original_post_id.media[0].url) }}
+                    style={styles.mediaImage}
+                    contentFit="cover"
+                  />
+                </Pressable>
               )}
             </View>
           )}
@@ -446,27 +448,28 @@ function PostItem({ post, onRefresh, onOpenProfile }: Props) {
         </Pressable>
       ) : post.media && post.media.length > 0 ? (
         <View> 
-          
           {checkIsVideo(post.media[0].url) ? (
-                <VideoPlayerItem 
-                  url={getValidMediaUrl(post.media[0].url)} 
-                  isMuted={isMuted} 
-                  onToggleMute={() => setIsMuted(!isMuted)} 
-                  hideMuteButton={false} 
-                />
-          ) : (
-            <Image
-              source={{ uri: getValidMediaUrl(post.media[0].url) }}
-              style={styles.mediaImage}
-              contentFit="cover"
+            <VideoPlayerItem 
+              url={resolveMediaUrl(post.media[0].url)} 
+              isMuted={isMuted} 
+              onToggleMute={() => setIsMuted(!isMuted)} 
+              hideMuteButton={false} 
             />
+          ) : (
+            <Pressable onPress={() => setFullScreenImageUrl(resolveMediaUrl(post.media[0].url))}>
+              <Image
+                source={{ uri: resolveMediaUrl(post.media[0].url) }}
+                style={styles.mediaImage}
+                contentFit="cover"
+              />
+            </Pressable>
           )}
         </View>
       ) : null}
       
 
       <View style={styles.statsRow}>
-        <View style={styles.likesStats}>
+        <Pressable onPress={handleShowLikers} style={styles.likesStats}>
           <View style={styles.badgeRow}>
             <View
               style={[
@@ -486,7 +489,7 @@ function PostItem({ post, onRefresh, onOpenProfile }: Props) {
             </View>
           </View>
           <Text style={styles.statsText}>{likesCount} {t("lượt thích", "likes")}</Text>
-        </View>
+        </Pressable>
         <View style={styles.otherStats}>
           <Text style={styles.statsText}>{commentsCount} {t("bình luận", "comments")}</Text>
           <Text style={styles.statsText}>{sharesCount} {t("chia sẻ", "shares")}</Text>
@@ -597,6 +600,58 @@ function PostItem({ post, onRefresh, onOpenProfile }: Props) {
         onClose={() => setIsShareModalVisible(false)}
         token={token}
       />
+
+      <Modal visible={!!fullScreenImageUrl} transparent={true} animationType="fade" onRequestClose={() => setFullScreenImageUrl(null)}>
+        <View style={styles.fullScreenModal}>
+          <Pressable style={styles.fullScreenCloseBtn} onPress={() => setFullScreenImageUrl(null)}>
+            <X color="#fff" size={28} />
+          </Pressable>
+          {fullScreenImageUrl && (
+            <Image
+              source={{ uri: fullScreenImageUrl }}
+              style={styles.fullScreenImage}
+              contentFit="contain"
+            />
+          )}
+        </View>
+      </Modal>
+
+      <Modal visible={showLikersModal} transparent={true} animationType="slide" onRequestClose={() => setShowLikersModal(false)}>
+        <View style={styles.likersModalContainer}>
+          <View style={styles.likersModalContent}>
+            <View style={styles.likersModalHeader}>
+              <Text style={styles.likersModalTitle}>{t("Lượt thích", "Likes")}</Text>
+              <Pressable onPress={() => setShowLikersModal(false)}>
+                <X color={palette.ink} size={24} />
+              </Pressable>
+            </View>
+            {isLoadingLikers ? (
+              <ActivityIndicator size="small" color={palette.primary} style={{ marginTop: 20 }} />
+            ) : likers.length === 0 ? (
+              <Text style={styles.noLikersText}>{t("Chưa có lượt thích nào", "No likes yet")}</Text>
+            ) : (
+              <ScrollView>
+                {likers.map((u) => (
+                  <Pressable 
+                    key={u._id} 
+                    style={styles.likerRow}
+                    onPress={() => {
+                      setShowLikersModal(false);
+                      if (u._id) onOpenProfile?.(u._id);
+                    }}
+                  >
+                    <Image source={{ uri: resolveMediaUrl(u.avatar_url) || `https://ui-avatars.com/api/?name=${u.username}` }} style={styles.likerAvatar} />
+                    <View>
+                      <Text style={styles.likerName}>{u.display_name || u.username}</Text>
+                      <Text style={styles.likerUsername}>@{u.username}</Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -693,6 +748,74 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 8,
     zIndex: 10,
+  },
+  fullScreenModal: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  fullScreenImage: {
+    width: "100%",
+    height: "100%",
+  },
+  fullScreenCloseBtn: {
+    position: "absolute",
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    padding: 8,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: 20,
+  },
+  likersModalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  likersModalContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: "80%",
+  },
+  likersModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  likersModalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: palette.ink,
+  },
+  noLikersText: {
+    textAlign: "center",
+    color: palette.muted,
+    padding: 20,
+  },
+  likerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: palette.line,
+  },
+  likerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  likerName: {
+    fontWeight: "600",
+    color: palette.ink,
+  },
+  likerUsername: {
+    color: palette.muted,
+    fontSize: 12,
   },
   statsRow: {
     flexDirection: "row",

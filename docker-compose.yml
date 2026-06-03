@@ -11,6 +11,9 @@ services:
       MINIO_ROOT_USER: admin           # Tên đăng nhập
       MINIO_ROOT_PASSWORD: password123 # Mật khẩu (ít nhất 8 ký tự)
     volumes:
-      - ./data:/data                   # Lưu dữ liệu thật vào thư mục data trên máy bạn
+      - minio_data:/data               # Lưu dữ liệu vào docker volume để tránh lỗi trên Windows
     command: server /data --console-address ":9001"
     restart: always
+
+volumes:
+  minio_data:

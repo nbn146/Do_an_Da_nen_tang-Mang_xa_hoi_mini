@@ -31,6 +31,7 @@ import { palette } from "../theme";
 import { ScreenGradient } from "../components/common/ScreenGradient";
 import PostItem from "../components/PostItem";
 import type { IPost, IUser } from "../types/models";
+import { resolveMediaUrl } from "../utils/media";
 
 const FlashListAny = FlashList as any;
 
@@ -38,7 +39,7 @@ type FollowListKind = "followers" | "following";
 
 function avatarFor(user: Pick<IUser, "display_name" | "username" | "avatar_url">) {
   return (
-    user.avatar_url ||
+    (user.avatar_url ? resolveMediaUrl(user.avatar_url) : null) ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(user.display_name || user.username)}&background=7c3aed&color=fff`
   );
 }
@@ -173,7 +174,7 @@ export default function ProfileScreen({ route, navigation }: any) {
       (profile?.posts || []).flatMap((post: IPost) =>
         (post.media || [])
           .filter((media) => media.type === "image")
-          .map((media) => media.url),
+          .map((media) => resolveMediaUrl(media.url)),
       ),
     [profile?.posts],
   );
