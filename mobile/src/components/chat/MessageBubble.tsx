@@ -47,16 +47,6 @@ const styles = StyleSheet.create({
   otherBubble: { backgroundColor: "#f3f4f6", borderBottomLeftRadius: 4 },
   ownText: { color: "#fff", fontSize: 15 },
   otherText: { color: palette.ink, fontSize: 15 },
-  ownTime: {
-    color: "rgba(255,255,255,0.7)",
-    fontSize: 10,
-    marginTop: 4,
-    alignSelf: "flex-end",
-  },
-  otherTime: {
-    color: palette.muted,
-    fontSize: 10,
-    marginTop: 4,
-    alignSelf: "flex-end",
-  },
+  ownTime: { color: "rgba(255,255,255,0.7)", fontSize: 10, marginTop: 4, alignSelf: "flex-end" },
+  otherTime: { color: palette.muted, fontSize: 10, marginTop: 4, alignSelf: "flex-end" },
 });

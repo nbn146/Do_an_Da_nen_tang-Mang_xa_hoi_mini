@@ -19,29 +19,21 @@ export function registerChatHandlers(socket: AuthenticatedSocket): void {
 
   // ── Typing ──────────────────────────────────
   socket.on("typing", (data: TypingPayload) => {
-    const conversationId = data.conversation_id ?? data.conversationId;
-    const receiverId = data.receiver_id ?? data.receiverId;
-    if (!conversationId || !receiverId) return;
-
-    const receiverSocketId = getReceiverSocketId(receiverId);
+    const receiverSocketId = getReceiverSocketId(data.receiverId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("typing", {
-        sender_id: userId,
-        conversation_id: conversationId,
+        senderId: userId,
+        conversationId: data.conversationId,
       });
     }
   });
 
   socket.on("stopTyping", (data: TypingPayload) => {
-    const conversationId = data.conversation_id ?? data.conversationId;
-    const receiverId = data.receiver_id ?? data.receiverId;
-    if (!conversationId || !receiverId) return;
-
-    const receiverSocketId = getReceiverSocketId(receiverId);
+    const receiverSocketId = getReceiverSocketId(data.receiverId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("stopTyping", {
-        sender_id: userId,
-        conversation_id: conversationId,
+        senderId: userId,
+        conversationId: data.conversationId,
       });
     }
   });
@@ -51,16 +43,15 @@ export function registerChatHandlers(socket: AuthenticatedSocket): void {
     "joinConversation",
     async (data: ConversationPayload, callback?: (ok: boolean) => void) => {
       try {
-        const conversationId = data.conversation_id ?? data.conversationId;
-        if (!conversationId || !mongoose.Types.ObjectId.isValid(conversationId)) {
+        if (!mongoose.Types.ObjectId.isValid(data.conversationId)) {
           callback?.(false);
           return;
         }
 
         // Kiểm tra user có quyền vào room này không
         const conv = await Conversation.findOne({
-          _id: conversationId,
-          participant_ids: new mongoose.Types.ObjectId(userId),
+          _id: data.conversationId,
+          participants: new mongoose.Types.ObjectId(userId),
         });
 
         if (!conv) {
@@ -68,8 +59,8 @@ export function registerChatHandlers(socket: AuthenticatedSocket): void {
           return;
         }
 
-        socket.join(conversationId);
-        console.log(`[Socket] ${userId} joined room ${conversationId}`);
+        socket.join(data.conversationId);
+        console.log(`[Socket] ${userId} joined room ${data.conversationId}`);
         callback?.(true);
       } catch (err) {
         console.error("[Socket] joinConversation error:", err);
@@ -79,8 +70,7 @@ export function registerChatHandlers(socket: AuthenticatedSocket): void {
   );
 
   socket.on("leaveConversation", (data: ConversationPayload) => {
-    const conversationId = data.conversation_id ?? data.conversationId;
-    if (conversationId) socket.leave(conversationId);
+    socket.leave(data.conversationId);
   });
 
   // ── Mark as read ─────────────────────────────
@@ -88,15 +78,14 @@ export function registerChatHandlers(socket: AuthenticatedSocket): void {
     "markAsRead",
     async (data: ConversationPayload, callback?: (ok: boolean) => void) => {
       try {
-        const conversationId = data.conversation_id ?? data.conversationId;
-        if (!conversationId || !mongoose.Types.ObjectId.isValid(conversationId)) {
+        if (!mongoose.Types.ObjectId.isValid(data.conversationId)) {
           callback?.(false);
           return;
         }
 
         const conversation = await Conversation.findOne({
-          _id: conversationId,
-          participant_ids: new mongoose.Types.ObjectId(userId),
+          _id: data.conversationId,
+          participants: new mongoose.Types.ObjectId(userId),
         });
 
         if (!conversation) {
@@ -109,20 +98,20 @@ export function registerChatHandlers(socket: AuthenticatedSocket): void {
         // Đánh dấu đã đọc tất cả tin chưa đọc của mình
         await Message.updateMany(
           {
-            conversation_id: conversationId,
-            receiver_id: new mongoose.Types.ObjectId(userId),
-            read_at: null,
+            conversationId: data.conversationId,
+            receiverId: new mongoose.Types.ObjectId(userId),
+            readAt: null,
           },
-          { $set: { read_at: now } },
+          { $set: { readAt: now } },
         );
 
         // Reset unread counter
-        await Conversation.findByIdAndUpdate(conversationId, {
-          $set: { [`unread_count.${userId}`]: 0 },
+        await Conversation.findByIdAndUpdate(data.conversationId, {
+          $set: { [`unreadCount.${userId}`]: 0 },
         });
 
         // Thông báo cho đối phương biết tin đã được đọc
-        const partnerId = conversation.participant_ids
+        const partnerId = conversation.participants
           .find((p) => p.toString() !== userId)
           ?.toString();
 
@@ -130,9 +119,9 @@ export function registerChatHandlers(socket: AuthenticatedSocket): void {
           const partnerSocketId = getReceiverSocketId(partnerId);
           if (partnerSocketId) {
             io.to(partnerSocketId).emit("messagesRead", {
-              conversation_id: conversationId,
-              read_by: userId,
-              read_at: now,
+              conversationId: data.conversationId,
+              readBy: userId,
+              readAt: now,
             });
           }
         }

@@ -1,12 +1,14 @@
 import express from 'express';
-import { createPost, deletePost, getNewsfeed, getPostById, sharePost, updatePost } from '../controllers/postController.js';
+import multer from 'multer';
+import { createPost, deletePost, getNewsfeed, getPostById, sharePost, repostPost, updatePost } from '../controllers/postController.js';
 import { reactToPost } from '../controllers/reactionController.js';
 import { getPersonalFeed } from '../controllers/feedController.js';
 import { createComment, getComments, getReplies, deleteComment } from '../controllers/commentController.js';
 import { verifyToken } from '../middleware/authMiddleware.js';
-import { uploadMultipleImages } from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
+// Dùng memoryStorage để lưu file trên RAM, sau đó Sharp nén xong mới đẩy đi
+const upload = multer({ storage: multer.memoryStorage() }); 
 
 // GET /api/post/feed — Personal feed (bài viết từ người follow + chính mình)
 router.get('/feed', verifyToken, getPersonalFeed);
@@ -16,8 +18,7 @@ router.get('/explore', verifyToken, getNewsfeed);
 router.get('/:postId', verifyToken, getPostById);
 
 // POST /api/post/createPost — Tạo bài viết mới
-// Upload tối đa 5 ảnh với giới hạn 5MB/ảnh (chống tràn RAM)
-router.post('/createPost', verifyToken, uploadMultipleImages, createPost);
+router.post('/createPost', verifyToken, upload.array('images', 5), createPost);
 
 // PATCH /api/post/:postId — Sửa bài viết
 router.patch('/:postId', verifyToken, updatePost);
@@ -28,8 +29,11 @@ router.delete('/:postId', verifyToken, deletePost);
 // POST /api/post/:postId/react — Like/react bài viết
 router.post('/:postId/react', verifyToken, reactToPost);
 
-// POST /api/post/:postId/share — Tăng số lượt chia sẻ
+// POST /api/post/:postId/share — Chia sẻ bài viết lên profile và tăng số lượt chia sẻ
 router.post('/:postId/share', verifyToken, sharePost);
+
+// POST /api/post/:postId/repost — Chia sẻ bài viết (Repost) lên tường
+router.post('/:postId/repost', verifyToken, repostPost);
 
 // ── Comment Routes ──
 // POST /api/post/:postId/comments — Tạo comment

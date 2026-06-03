@@ -45,11 +45,7 @@ export function useSocketEmit() {
   const socket = getSocket();
 
   const emit = useCallback(
-    <T = unknown>(
-      event: string,
-      data?: T,
-      callback?: (response: unknown) => void,
-    ) => {
+    <T = unknown>(event: string, data?: T, callback?: (response: unknown) => void) => {
       if (callback) {
         socket.emit(event, data, callback);
       } else {

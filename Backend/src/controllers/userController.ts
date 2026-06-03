@@ -6,6 +6,7 @@ import User from "../models/userModel.js";
 import Follow from "../models/Follows.js";
 import { uploadAndCompressImage } from "../services/minioService.js";
 import { successResponse, errorResponse } from "../utils/response.js";
+import { getVisibilityFilter } from "../utils/visibilityFilter.js";
 
 // ==========================================
 // 1. LẤY THÔNG TIN PROFILE & BÀI VIẾT
@@ -15,18 +16,26 @@ export const getUserProfile = async (
   res: Response,
 ): Promise<void> => {
   try {
-    const { id } = req.params as { id: string }; // ID của user cần xem profile
+    const { id } = req.params; // ID của user cần xem profile
 
     // Lấy thông tin user (giấu password đi)
-    const user = await User.findById(id).select("-password");
+    const user = await User.findById(id).select("-password_hash");
     if (!user) {
       errorResponse(req, res, "user.NOT_FOUND", 404, "NOT_FOUND");
       return;
     }
 
-    // Lấy các bài viết của user này
-    const posts = await PostModel.find({ author_id: id } as any)
+    // Lấy các bài viết của user này (filter theo quyền xem của viewer)
+    const viewerId = (req as any).userId as string | undefined;
+    const visibilityFilter = await getVisibilityFilter(viewerId, String(id));
+    const posts = await PostModel.find({ author_id: id, ...visibilityFilter } as any)
       .sort({ created_at: -1 })
+      .populate("author_id", "username display_name avatar_url")
+      .populate({
+        path: "original_post_id",
+        select: "content media author_id is_repost stats created_at visibility",
+        populate: { path: "author_id", select: "_id username display_name avatar_url" }
+      })
       .lean();
 
     successResponse(
@@ -237,6 +246,11 @@ export const getMyProfile = async (
       PostModel.find({ author_id: userId } as any)
         .sort({ created_at: -1 })
         .populate("author_id", "username display_name avatar_url")
+        .populate({
+          path: "original_post_id",
+          select: "content media author_id is_repost stats created_at visibility",
+          populate: { path: "author_id", select: "_id username display_name avatar_url" }
+        })
         .lean(),
       Follow.countDocuments({ following_id: userId, status: "accepted" }),
       Follow.countDocuments({ follower_id: userId, status: "accepted" }),

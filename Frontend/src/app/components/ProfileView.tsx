@@ -17,8 +17,10 @@ import { toast } from "sonner";
 import apiClient from "../../services/api";
 import { useCurrentUser } from "../../hooks/useCurrentUser";
 import { useLangText } from "../../hooks/useLangText";
-import { copyProfileLink, sharePostLink } from "../../utils/share";
+import { resolveMediaUrl } from "../../utils/mediaUrl";
+import { copyProfileLink } from "../../utils/share";
 import { PostCard } from "./PostCard";
+import { ShareModal } from "./ShareModal";
 import type { IMyProfile, IPost, IUser } from "../../types/models";
 
 interface ProfileViewProps {
@@ -36,7 +38,7 @@ type FollowListKind = "followers" | "following";
 
 function avatarFor(user: Pick<IUser, "display_name" | "username" | "avatar_url">) {
   return (
-    user.avatar_url ||
+    resolveMediaUrl(user.avatar_url) ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(user.display_name || user.username)}&background=7c3aed&color=fff`
   );
 }
@@ -72,6 +74,7 @@ export function ProfileView({ userId, onEditProfile, onOpenProfile }: ProfileVie
   const [followUsers, setFollowUsers] = useState<IUser[]>([]);
   const [isLoadingFollowList, setIsLoadingFollowList] = useState(false);
   const [showProfileOptions, setShowProfileOptions] = useState(false);
+  const [shareModalPostId, setShareModalPostId] = useState<string | null>(null);
 
   const fetchProfile = useCallback(async () => {
     const token = localStorage.getItem("userToken");
@@ -227,34 +230,9 @@ export function ProfileView({ userId, onEditProfile, onOpenProfile }: ProfileVie
     }
   }, [text]);
 
-  const handleSharePost = useCallback(async (postId: string) => {
-    try {
-      const response = await apiClient.post(`/post/${postId}/share`);
-      const shares = response.data.data?.shares;
-      setProfile((prev) =>
-        prev
-          ? {
-              ...prev,
-              posts: prev.posts.map((post) =>
-                post._id === postId
-                  ? {
-                      ...post,
-                      stats: {
-                        ...post.stats,
-                        shares: typeof shares === "number" ? shares : post.stats.shares + 1,
-                      },
-                    }
-                  : post,
-              ),
-            }
-          : prev,
-      );
-      await sharePostLink(postId);
-    } catch (err) {
-      console.error("Share failed:", err);
-      toast.error(text("Không thể chia sẻ bài viết.", "Could not share post."));
-    }
-  }, [text]);
+  const handleSharePost = useCallback((postId: string) => {
+    setShareModalPostId(postId);
+  }, []);
 
   const handleReportProfile = useCallback(async () => {
     if (!targetUserId || isOwnProfile) return;
@@ -291,7 +269,7 @@ export function ProfileView({ userId, onEditProfile, onOpenProfile }: ProfileVie
       (profile?.posts || []).flatMap((post) =>
         (post.media || [])
           .filter((media) => media.type === "image")
-          .map((media) => media.url),
+          .map((media) => resolveMediaUrl(media.url)),
       ),
     [profile?.posts],
   );
@@ -591,6 +569,14 @@ export function ProfileView({ userId, onEditProfile, onOpenProfile }: ProfileVie
           </div>
         </div>
       ) : null}
+
+      {shareModalPostId && (
+        <ShareModal
+          postId={shareModalPostId}
+          isOpen={!!shareModalPostId}
+          onClose={() => setShareModalPostId(null)}
+        />
+      )}
     </div>
   );
 }

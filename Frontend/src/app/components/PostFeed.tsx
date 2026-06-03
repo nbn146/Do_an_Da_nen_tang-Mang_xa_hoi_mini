@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { Camera, Loader2, Smile, Video } from "lucide-react";
 import { toast } from "sonner";
@@ -8,7 +7,6 @@ import { ShareModal } from "./ShareModal";
 import apiClient from "../../services/api";
 import { useCurrentUser } from "../../hooks/useCurrentUser";
 import { useLangText } from "../../hooks/useLangText";
-import { sharePostLink } from "../../utils/share";
 import type { IPost } from "../../types/models";
 
 interface PostFeedProps {

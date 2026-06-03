@@ -1,4 +1,3 @@
-
 import Post from "../models/postModel.js";
 import User from "../models/userModel.js";
 import type { Request, Response } from "express";
