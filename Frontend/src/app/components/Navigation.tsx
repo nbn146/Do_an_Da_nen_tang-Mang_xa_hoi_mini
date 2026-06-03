@@ -1,7 +1,25 @@
-import { Home, Search, Bell, User, MessageCircle, PlusSquare, Settings, LogOut } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import {
+  Bell,
+  Home,
+  MessageCircle,
+  PlusSquare,
+  Search,
+  Settings,
+  User,
+} from "lucide-react";
+import { useNotifications } from "../../hooks/useNotifications";
+import { useConversations } from "../../hooks/useConversations";
+import { useLangText } from "../../hooks/useLangText";
+import { connectSocket } from "../../services/socketService";
 
-type ViewType = "feed" | "profile" | "notifications" | "messages" | "search" | "settings";
+type ViewType =
+  | "feed"
+  | "profile"
+  | "notifications"
+  | "messages"
+  | "search"
+  | "settings";
 
 interface NavigationProps {
   onViewChange: (view: ViewType) => void;
@@ -9,14 +27,27 @@ interface NavigationProps {
   onCreatePost: () => void;
 }
 
-export function Navigation({ onViewChange, activeView, onCreatePost }: NavigationProps) {
-  const navigate = useNavigate();
+export function Navigation({
+  onViewChange,
+  activeView,
+  onCreatePost,
+}: NavigationProps) {
+  const { unreadCount } = useNotifications();
+  const { conversations } = useConversations();
+  const text = useLangText();
+  const unreadMessageCount = conversations.reduce(
+    (total, conversation) => total + (conversation.unreadCount || 0),
+    0,
+  );
+
+  useEffect(() => {
+    connectSocket();
+  }, []);
 
   return (
     <nav className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
           <div className="flex items-center space-x-2">
             <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
               <span className="text-white text-xl font-bold">S</span>
@@ -25,22 +56,20 @@ export function Navigation({ onViewChange, activeView, onCreatePost }: Navigatio
               Social Mini
             </h1>
           </div>
-          
-          {/* Search Bar */}
+
           <div className="hidden md:flex flex-1 max-w-md mx-8">
             <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Tìm kiếm..."
+                placeholder={text("Tìm kiếm...", "Search...")}
                 onFocus={() => onViewChange("search")}
                 className="w-full pl-10 pr-4 py-2 bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all cursor-pointer"
                 readOnly
               />
             </div>
           </div>
-          
-          {/* Navigation Icons */}
+
           <div className="flex items-center space-x-1 sm:space-x-2">
             <button
               onClick={() => onViewChange("feed")}
@@ -49,7 +78,7 @@ export function Navigation({ onViewChange, activeView, onCreatePost }: Navigatio
                   ? "bg-purple-100 text-purple-600"
                   : "hover:bg-gray-100 text-gray-600"
               }`}
-              title="Trang chủ"
+              title={text("Trang chủ", "Home")}
             >
               <Home className="w-6 h-6" />
             </button>
@@ -61,7 +90,7 @@ export function Navigation({ onViewChange, activeView, onCreatePost }: Navigatio
                   ? "bg-purple-100 text-purple-600"
                   : "hover:bg-gray-100 text-gray-600"
               }`}
-              title="Tìm kiếm"
+              title={text("Tìm kiếm", "Search")}
             >
               <Search className="w-6 h-6" />
             </button>
@@ -73,16 +102,20 @@ export function Navigation({ onViewChange, activeView, onCreatePost }: Navigatio
                   ? "bg-purple-100 text-purple-600"
                   : "hover:bg-gray-100 text-gray-600"
               }`}
-              title="Tin nhắn"
+              title={text("Tin nhắn", "Messages")}
             >
               <MessageCircle className="w-6 h-6" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              {unreadMessageCount > 0 ? (
+                <span className="absolute top-1 right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs text-white">
+                  {unreadMessageCount > 99 ? "99+" : unreadMessageCount}
+                </span>
+              ) : null}
             </button>
 
             <button
               onClick={onCreatePost}
               className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-all"
-              title="Tạo bài viết"
+              title={text("Tạo bài viết", "Create post")}
             >
               <PlusSquare className="w-6 h-6" />
             </button>
@@ -94,12 +127,14 @@ export function Navigation({ onViewChange, activeView, onCreatePost }: Navigatio
                   ? "bg-purple-100 text-purple-600"
                   : "hover:bg-gray-100 text-gray-600"
               }`}
-              title="Thông báo"
+              title={text("Thông báo", "Notifications")}
             >
               <Bell className="w-6 h-6" />
-              <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
-                3
-              </span>
+              {unreadCount > 0 ? (
+                <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              ) : null}
             </button>
 
             <button
@@ -109,7 +144,7 @@ export function Navigation({ onViewChange, activeView, onCreatePost }: Navigatio
                   ? "bg-purple-100 text-purple-600"
                   : "hover:bg-gray-100 text-gray-600"
               }`}
-              title="Trang cá nhân"
+              title={text("Trang cá nhân", "Profile")}
             >
               <User className="w-6 h-6" />
             </button>
@@ -121,17 +156,9 @@ export function Navigation({ onViewChange, activeView, onCreatePost }: Navigatio
                   ? "bg-purple-100 text-purple-600"
                   : "hover:bg-gray-100 text-gray-600"
               }`}
-              title="Cài đặt"
+              title={text("Cài đặt", "Settings")}
             >
               <Settings className="w-6 h-6" />
-            </button>
-
-            <button
-              onClick={() => navigate("/login")}
-              className="p-2 rounded-lg hover:bg-red-50 text-red-500 transition-all hidden sm:block"
-              title="Đăng xuất"
-            >
-              <LogOut className="w-6 h-6" />
             </button>
           </div>
         </div>

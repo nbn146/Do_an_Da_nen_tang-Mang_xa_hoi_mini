@@ -8,6 +8,8 @@ export interface IUser extends Document {
     display_name: string;
     avatar_url: string;
     bio: string;
+    location?: string;
+    website?: string;
     following: mongoose.Types.ObjectId[];
     followers: mongoose.Types.ObjectId[];
     settings: {
@@ -16,6 +18,7 @@ export interface IUser extends Document {
         two_factor_enable: boolean;
     };
     status: 'active' | 'locked' | 'pending';
+    role: 'user' | 'admin';
     created_at: Date;
     updated_at: Date;
 }
@@ -28,6 +31,8 @@ const userSchema: Schema = new Schema({
     display_name: { type: String, required: true, trim: true },
     avatar_url: { type: String, default: 'avatars/default_profile.webp' },
     bio: { type: String, default: '' },
+    location: { type: String, default: '', trim: true },
+    website: { type: String, default: '', trim: true },
     following: { type: [mongoose.Schema.Types.ObjectId], ref: 'User' },
     followers: { type: [mongoose.Schema.Types.ObjectId], ref: 'User' },
     settings: {
@@ -35,7 +40,8 @@ const userSchema: Schema = new Schema({
         privacy: { type: String, enum: ['public', 'friends', 'private'], default: 'public' },
         two_factor_enable: { type: Boolean, default: false }
     },
-    status: { type: String, enum: ['active', 'locked', 'pending'], default: 'active' }
+    status: { type: String, enum: ['active', 'locked', 'pending'], default: 'active' },
+    role: { type: String, enum: ['user', 'admin'], default: 'user' }
 }, {
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
     collection: 'users'

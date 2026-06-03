@@ -1,10 +1,9 @@
 // Frontend Vite: src/services/api.ts
 import axios from 'axios';
-
-const BASE_URL = 'http://localhost:3000/api'; 
+import env from '../config/env';
 
 const apiClient = axios.create({
-  baseURL: BASE_URL,
+  baseURL: env.API_BASE_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -22,6 +21,24 @@ apiClient.interceptors.request.use(
     return config;
   },
   (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response Interceptor: xóa token khi nhận 401 (token hết hạn/invalid)
+// KHÔNG auto-redirect — để router guard hoặc component xử lý
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Bỏ qua 401 từ auth endpoints (login sai mật khẩu → 401 là bình thường)
+      const url = error.config?.url || '';
+      const isAuthEndpoint = url.includes('/auth/');
+      if (!isAuthEndpoint) {
+        localStorage.removeItem('userToken');
+        localStorage.removeItem('userData');
+      }
+    }
     return Promise.reject(error);
   }
 );

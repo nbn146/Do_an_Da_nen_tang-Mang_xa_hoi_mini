@@ -6,4 +6,6 @@ mobile/.expo/
 .env
 backend/uploads/
 *.log
-data/
+.Agents/
+scripts/
+sequencediagram/

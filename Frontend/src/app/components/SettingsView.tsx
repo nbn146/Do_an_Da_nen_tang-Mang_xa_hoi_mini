@@ -26,7 +26,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import apiClient from "../../services/api";
 import { authService } from "../../services/authService";
-import type { IMyProfile } from "../../types/models.ts";
+import type { IMyProfile } from "../../types/models";
 
 interface SettingsViewProps {
   onViewChange: (

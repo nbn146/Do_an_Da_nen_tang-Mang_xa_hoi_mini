@@ -2,7 +2,7 @@ import { Calendar, Mail, Phone, Loader2 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import apiClient from "../../services/api";
 import { useLangText } from "../../hooks/useLangText";
-import type { IMyProfile } from "../../types/models.ts";
+import type { IMyProfile } from "../../types/models";
 
 interface ProfileCardProps {
   onEditProfile?: () => void;

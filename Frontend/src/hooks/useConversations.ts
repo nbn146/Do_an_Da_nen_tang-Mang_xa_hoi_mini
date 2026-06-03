@@ -6,16 +6,14 @@ import { useCurrentUser } from "./useCurrentUser";
 export interface IMessage {
   _id: string;
   conversationId: string;
-  sender:
-    | string
-    | {
-        _id: string;
-        username: string;
-        display_name: string;
-        avatar_url?: string;
-        avatar?: string;
-      };
-  receiver: string;
+  senderId: string | {
+    _id: string;
+    username: string;
+    display_name: string;
+    avatar_url?: string;
+    avatar?: string;
+  };
+  receiverId: string;
   content: string;
   mediaUrl?: string;
   media_type?: string;
@@ -38,9 +36,12 @@ export interface IConversation {
   partner?: IPartner | null;
   participants?: IPartner[];
   lastMessage?: {
-    content: string;
-    sender: string;
-    createdAt: string;
+    _id?: string;
+    content?: string;
+    senderId?: string | IPartner;
+    messageType?: "text" | "image" | "file";
+    mediaUrl?: string;
+    createdAt?: string;
   } | null;
   unreadCount?: number;
   updatedAt: string;
@@ -53,6 +54,33 @@ interface NewMessagePayload {
 
 const CONVERSATION_READ_EVENT = "miniSocial:conversation-read";
 
+type SenderRef = string | { _id?: string; id?: string } | null | undefined;
+
+function getSenderId(value: SenderRef): string | null {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  return value._id || ("id" in value ? value.id || null : null);
+}
+
+function getMessageSenderId(message: Partial<IMessage> | null | undefined): string | null {
+  if (!message) return null;
+  const legacy = message as Partial<IMessage> & {
+    sender?: SenderRef;
+    author?: SenderRef;
+    user?: SenderRef;
+    userId?: SenderRef;
+  };
+  return getSenderId(
+    legacy.senderId ?? legacy.sender ?? legacy.userId ?? legacy.user ?? legacy.author,
+  );
+}
+
+function normalizeMessagesResponse(data: unknown): IMessage[] {
+  if (Array.isArray(data)) return data as IMessage[];
+  const wrapped = data as { messages?: unknown } | null | undefined;
+  return Array.isArray(wrapped?.messages) ? (wrapped.messages as IMessage[]) : [];
+}
+
 export function useConversations() {
   const currentUser = useCurrentUser();
   const [conversations, setConversations] = useState<IConversation[]>([]);
@@ -62,7 +90,8 @@ export function useConversations() {
     try {
       setIsLoading(true);
       const response = await apiClient.get("/conversations");
-      setConversations(response.data.data || []);
+      const data = response.data.data;
+      setConversations(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Load conversations failed:", err);
     } finally {
@@ -87,10 +116,7 @@ export function useConversations() {
 
     window.addEventListener(CONVERSATION_READ_EVENT, handleConversationRead);
     return () => {
-      window.removeEventListener(
-        CONVERSATION_READ_EVENT,
-        handleConversationRead,
-      );
+      window.removeEventListener(CONVERSATION_READ_EVENT, handleConversationRead);
     };
   }, []);
 
@@ -106,20 +132,28 @@ export function useConversations() {
   }, []);
 
   useSocketEvent<NewMessagePayload>("newMessage", (payload) => {
-    const msg = payload.message;
-    const senderId =
-      typeof msg.sender === "string" ? msg.sender : msg.sender._id;
-    const isFromCurrentUser = Boolean(
-      currentUser?._id && senderId === currentUser._id,
-    );
+    const msg = payload?.message;
+    if (!msg || (!msg.conversationId && !payload?.conversationId)) return;
+    const senderId = getMessageSenderId(msg);
+    const isFromCurrentUser = Boolean(currentUser?._id && senderId === currentUser._id);
+    const conversationId = payload?.conversationId || msg.conversationId;
+
+    if (!conversations.some((conv) => conv._id === conversationId)) {
+      void fetchConversations();
+      return;
+    }
+
     setConversations((prev) => {
       const updated = prev.map((conv) =>
-        conv._id === payload.conversationId
+        conv._id === conversationId
           ? {
               ...conv,
               lastMessage: {
-                content: msg.content,
-                sender: senderId,
+                _id: msg._id,
+                content: msg.content || "",
+                senderId: senderId || undefined,
+                messageType: msg.messageType,
+                mediaUrl: msg.mediaUrl,
                 createdAt: msg.createdAt,
               },
               unreadCount: isFromCurrentUser
@@ -131,8 +165,7 @@ export function useConversations() {
       );
 
       return updated.sort(
-        (a, b) =>
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
       );
     });
   });
@@ -163,11 +196,9 @@ export function useMessages(conversationId: string | null) {
     const fetchMessages = async () => {
       try {
         setIsLoading(true);
-        const response = await apiClient.get(
-          `/conversations/${conversationId}/messages`,
-        );
+        const response = await apiClient.get(`/conversations/${conversationId}/messages`);
         const data = response.data.data;
-        if (isActive) setMessages(data?.messages || data || []);
+        if (isActive) setMessages(normalizeMessagesResponse(data));
       } catch (err) {
         console.error("Load messages failed:", err);
       } finally {
@@ -185,46 +216,69 @@ export function useMessages(conversationId: string | null) {
   }, [conversationId, emit]);
 
   useSocketEvent<NewMessagePayload>("newMessage", (payload) => {
-    if (payload.conversationId === conversationId) {
+    const msg = payload?.message;
+    const payloadConversationId = payload?.conversationId || msg?.conversationId;
+    if (payloadConversationId === conversationId && msg) {
       setMessages((prev) =>
-        prev.some((message) => message._id === payload.message._id)
+        prev.some((message) => message._id === msg._id)
           ? prev
-          : [...prev, payload.message],
+          : [...prev, msg],
       );
     }
   });
 
-  useSocketEvent<{ senderId: string; conversationId: string }>(
-    "typing",
+  useSocketEvent<{ conversationId: string; readBy?: string; readAt?: string | Date }>(
+    "messagesRead",
     (data) => {
-      if (data.conversationId === conversationId) setIsTyping(true);
+      if (data.conversationId !== conversationId) return;
+      const readAt =
+        typeof data.readAt === "string"
+          ? data.readAt
+          : data.readAt?.toISOString?.() || new Date().toISOString();
+      setMessages((prev) =>
+        prev.map((message) =>
+          data.readBy && message.receiverId === data.readBy
+            ? { ...message, readAt }
+            : message,
+        ),
+      );
     },
   );
 
-  useSocketEvent<{ senderId: string; conversationId: string }>(
-    "stopTyping",
+  useSocketEvent<{ messageIds?: string[]; receiverId?: string }>(
+    "messagesDelivered",
     (data) => {
-      if (data.conversationId === conversationId) setIsTyping(false);
+      const deliveredIds = new Set(data.messageIds || []);
+      if (deliveredIds.size === 0) return;
+      const deliveredAt = new Date().toISOString();
+      setMessages((prev) =>
+        prev.map((message) =>
+          deliveredIds.has(message._id) ? { ...message, deliveredAt } : message,
+        ),
+      );
     },
   );
+
+  useSocketEvent<{ senderId: string; conversationId: string }>("typing", (data) => {
+    if (data.conversationId === conversationId) setIsTyping(true);
+  });
+
+  useSocketEvent<{ senderId: string; conversationId: string }>("stopTyping", (data) => {
+    if (data.conversationId === conversationId) setIsTyping(false);
+  });
 
   const sendMessage = useCallback(
     async (content: string) => {
       if (!conversationId || !content.trim()) return undefined;
 
       try {
-        const response = await apiClient.post(
-          `/conversations/${conversationId}/messages`,
-          {
-            content: content.trim(),
-          },
-        );
+        const response = await apiClient.post(`/conversations/${conversationId}/messages`, {
+          content: content.trim(),
+        });
         const message = response.data.data as IMessage | undefined;
         if (message) {
           setMessages((prev) =>
-            prev.some((item) => item._id === message._id)
-              ? prev
-              : [...prev, message],
+            prev.some((item) => item._id === message._id) ? prev : [...prev, message],
           );
         }
         return message;
@@ -254,9 +308,7 @@ export function useMessages(conversationId: string | null) {
         const message = response.data.data as IMessage | undefined;
         if (message) {
           setMessages((prev) =>
-            prev.some((item) => item._id === message._id)
-              ? prev
-              : [...prev, message],
+            prev.some((item) => item._id === message._id) ? prev : [...prev, message],
           );
         }
         return message;

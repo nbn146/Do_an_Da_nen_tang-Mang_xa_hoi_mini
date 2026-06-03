@@ -9,23 +9,33 @@ import {
   Paperclip,
   Search,
   Send,
-  Smile,
 } from "lucide-react";
 import { toast } from "sonner";
 import { copyText } from "../../utils/share";
-import { useConversations, useMessages } from "../../hooks/useConversations";
+import {
+  useConversations,
+  useMessages,
+  type IConversation,
+  type IMessage,
+} from "../../hooks/useConversations";
 import { useCurrentUser } from "../../hooks/useCurrentUser";
 import { useLangText } from "../../hooks/useLangText";
+import { resolveMediaUrl } from "../../utils/mediaUrl";
+import { PostDetailModal } from "./PostDetailModal";
 
 interface MessagesViewProps {
   initialConversationId?: string | null;
+  onOpenProfile?: (id: string) => void;
 }
 
 function timeAgo(
-  dateStr: string,
+  dateStr: string | null | undefined,
   text: (vi: string, en: string) => string,
 ): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
+  if (!dateStr) return "";
+  const timestamp = new Date(dateStr).getTime();
+  if (Number.isNaN(timestamp)) return "";
+  const diff = Date.now() - timestamp;
   const minutes = Math.floor(diff / 60000);
   if (minutes < 1) return text("Vừa xong", "Just now");
   if (minutes < 60) return text(`${minutes} phút`, `${minutes} min`);
@@ -33,13 +43,74 @@ function timeAgo(
   if (hours < 24) return text(`${hours} giờ`, `${hours} hr`);
   const days = Math.floor(hours / 24);
   if (days < 7) return text(`${days} ngày`, `${days} d`);
-  return new Date(dateStr).toLocaleDateString(text("vi-VN", "en-US"));
+  return new Date(timestamp).toLocaleDateString(text("vi-VN", "en-US"));
 }
 
-const QUICK_EMOJIS = ["😀", "😂", "😍", "👍", "🙏", "🔥", "🎉", "❤️"];
+type SenderRef = string | { _id?: string; id?: string } | null | undefined;
+type LooseMessage = IMessage & {
+  sender?: SenderRef;
+  author?: SenderRef;
+  user?: SenderRef;
+  userId?: SenderRef;
+  media_url?: string;
+  created_at?: string;
+};
+
+function getSenderId(value: SenderRef): string | null {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  return value._id || ("id" in value ? value.id || null : null);
+}
+
+function getMessageSenderId(message: IMessage): string | null {
+  const loose = message as LooseMessage;
+  return getSenderId(
+    loose.senderId ??
+      loose.sender ??
+      loose.userId ??
+      loose.user ??
+      loose.author,
+  );
+}
+
+function getMessageType(message: Partial<IMessage> | null | undefined): string | null {
+  if (!message) return null;
+  return message.messageType || "text";
+}
+
+function getSharedPost(message: any): any {
+  if (!message) return null;
+  return message.sharedPostId || null;
+}
+
+function getMessageMediaUrl(message: IMessage): string {
+  const loose = message as LooseMessage;
+  return resolveMediaUrl(loose.mediaUrl || loose.media_url || "");
+}
+
+function getMessageCreatedAt(message: IMessage): string {
+  const loose = message as LooseMessage;
+  return loose.createdAt || loose.created_at || "";
+}
+
+function getConversationPreview(
+  lastMessage: IConversation["lastMessage"],
+  text: (vi: string, en: string) => string,
+): string {
+  if (!lastMessage) {
+    return text("Bắt đầu cuộc trò chuyện...", "Start a conversation...");
+  }
+  const content = lastMessage.content?.trim();
+  if (content) return content;
+  if (lastMessage.messageType === "image") return text("Ảnh", "Image");
+  if (lastMessage.messageType === "file")
+    return text("Tệp đính kèm", "Attachment");
+  return text("Tin nhắn", "Message");
+}
 
 export function MessagesView({
   initialConversationId = null,
+  onOpenProfile,
 }: MessagesViewProps) {
   const currentUser = useCurrentUser();
   const text = useLangText();
@@ -54,8 +125,8 @@ export function MessagesView({
   >(initialConversationId);
   const [messageText, setMessageText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showChatOptions, setShowChatOptions] = useState(false);
+  const [selectedSharedPostId, setSelectedSharedPostId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -87,7 +158,6 @@ export function MessagesView({
       void markAsRead();
     }
     setShowChatOptions(false);
-    setShowEmojiPicker(false);
   }, [selectedConversationId, markAsRead, markConversationRead]);
 
   useEffect(() => {
@@ -149,19 +219,14 @@ export function MessagesView({
     [refetch, sendAttachment, text],
   );
 
-  const handleSelectEmoji = useCallback((emoji: string) => {
-    setMessageText((value) => `${value}${emoji}`);
-    setShowEmojiPicker(false);
-  }, []);
-
   const handleInputChange = (value: string) => {
     setMessageText(value);
     if (selectedPartner && value.trim()) sendTyping(selectedPartner._id);
   };
 
   const partnerAvatar = selectedPartner
-    ? selectedPartner.avatar_url ||
-      selectedPartner.avatar ||
+    ? resolveMediaUrl(selectedPartner.avatar_url) ||
+      resolveMediaUrl(selectedPartner.avatar) ||
       `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedPartner.display_name || selectedPartner.username)}&background=7c3aed&color=fff`
     : "";
 
@@ -214,10 +279,15 @@ export function MessagesView({
                 const partner = conv.partner;
                 if (!partner) return null;
                 const avatar =
-                  partner.avatar_url ||
-                  partner.avatar ||
+                  resolveMediaUrl(partner.avatar_url) ||
+                  resolveMediaUrl(partner.avatar) ||
                   `https://ui-avatars.com/api/?name=${encodeURIComponent(partner.display_name || partner.username)}&background=7c3aed&color=fff`;
-                const lastMsg = conv.lastMessage;
+                const lastMsg = conv.lastMessage
+                  ? {
+                      ...conv.lastMessage,
+                      content: getConversationPreview(conv.lastMessage, text),
+                    }
+                  : null;
                 const unread = conv.unreadCount || 0;
 
                 return (
@@ -368,16 +438,23 @@ export function MessagesView({
                     </p>
                   </div>
                 ) : (
-                  messages.map((message) => {
-                    const senderId =
-                      typeof message.sender === "string"
-                        ? message.sender
-                        : message.sender._id;
-                    const isOwn = senderId === currentUser?._id;
+                  messages.map((message, index) => {
+                    const senderId = getMessageSenderId(message);
+                    const isOwn = Boolean(
+                      senderId && senderId === currentUser?._id,
+                    );
+                    const messageType = getMessageType(message);
+                    const mediaUrl = getMessageMediaUrl(message);
+                    const createdAt = getMessageCreatedAt(message);
+                    const content = message.content || "";
+                    const sharedPost = getSharedPost(message);
 
                     return (
                       <div
-                        key={message._id}
+                        key={
+                          message._id ||
+                          `${message.conversationId}-${createdAt || index}`
+                        }
                         className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
                       >
                         <div
@@ -387,16 +464,15 @@ export function MessagesView({
                               : "bg-gray-100 text-gray-900 rounded-bl-sm"
                           }`}
                         >
-                          {message.messageType === "image" &&
-                          message.mediaUrl ? (
+                          {messageType === "image" && mediaUrl ? (
                             <a
-                              href={message.mediaUrl}
+                              href={mediaUrl}
                               target="_blank"
                               rel="noreferrer"
                               className="block"
                             >
                               <img
-                                src={message.mediaUrl}
+                                src={mediaUrl}
                                 alt={
                                   message.content ||
                                   text("Ảnh đã gửi", "Sent image")
@@ -405,10 +481,9 @@ export function MessagesView({
                               />
                             </a>
                           ) : null}
-                          {message.messageType === "file" &&
-                          message.mediaUrl ? (
+                          {messageType === "file" && mediaUrl ? (
                             <a
-                              href={message.mediaUrl}
+                              href={mediaUrl}
                               target="_blank"
                               rel="noreferrer"
                               className={`mb-2 flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${
@@ -419,19 +494,49 @@ export function MessagesView({
                             >
                               <Paperclip className="h-4 w-4" />
                               <span className="truncate">
-                                {message.content ||
-                                  text("Tệp đính kèm", "Attachment")}
+                                {content || text("Tệp đính kèm", "Attachment")}
                               </span>
                             </a>
                           ) : null}
-                          {message.content && message.messageType !== "file" ? (
-                            <p className="text-sm">{message.content}</p>
+                          
+                          {messageType === "shared_post" && sharedPost ? (
+                            <div 
+                              className={`mb-2 p-3 rounded-xl cursor-pointer transition-colors ${
+                                isOwn ? "bg-white/10 hover:bg-white/20" : "bg-white border hover:bg-gray-50"
+                              }`}
+                              onClick={() => setSelectedSharedPostId(sharedPost._id || sharedPost)}
+                            >
+                              <div className="flex items-center gap-2 mb-2">
+                                <img 
+                                  src={sharedPost.author_id?.avatar_url || `https://ui-avatars.com/api/?name=${sharedPost.author_id?.username || 'User'}`} 
+                                  alt="Avatar" 
+                                  className="w-6 h-6 rounded-full"
+                                />
+                                <span className={`text-xs font-semibold ${isOwn ? "text-white" : "text-gray-800"}`}>
+                                  {sharedPost.author_id?.display_name || sharedPost.author_id?.username || 'Người dùng'}
+                                </span>
+                              </div>
+                              <p className={`text-sm line-clamp-2 ${isOwn ? "text-white" : "text-gray-800"}`}>
+                                {sharedPost.content || text('Đã chia sẻ một bài viết', 'Shared a post')}
+                              </p>
+                              {sharedPost.media && sharedPost.media.length > 0 && (
+                                <div className="mt-2 text-xs opacity-80 italic">
+                                  {text('[Đính kèm hình ảnh/video]', '[Media attached]')}
+                                </div>
+                              )}
+                            </div>
                           ) : null}
-                          <p
-                            className={`text-xs mt-1 ${isOwn ? "text-purple-100" : "text-gray-500"}`}
-                          >
-                            {timeAgo(message.createdAt, text)}
-                          </p>
+
+                          {content && messageType !== "file" && messageType !== "shared_post" ? (
+                            <p className="text-sm">{content}</p>
+                          ) : null}
+                          {createdAt ? (
+                            <p
+                              className={`text-xs mt-1 ${isOwn ? "text-purple-100" : "text-gray-500"}`}
+                            >
+                              {timeAgo(createdAt, text)}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
                     );
@@ -491,30 +596,9 @@ export function MessagesView({
                         "Nhập tin nhắn...",
                         "Type a message...",
                       )}
-                      className="w-full px-4 py-2 pr-10 bg-gray-100 rounded-full resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm max-h-32"
+                      className="w-full px-4 py-2 bg-gray-100 rounded-full resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm max-h-32"
                       rows={1}
                     />
-                    {showEmojiPicker ? (
-                      <div className="absolute bottom-11 right-0 z-20 grid grid-cols-4 gap-1 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
-                        {QUICK_EMOJIS.map((emoji) => (
-                          <button
-                            key={emoji}
-                            type="button"
-                            onClick={() => handleSelectEmoji(emoji)}
-                            className="h-9 w-9 rounded-lg text-lg hover:bg-gray-100"
-                          >
-                            {emoji}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                    <button
-                      onClick={() => setShowEmojiPicker((value) => !value)}
-                      title="Emoji"
-                      className="absolute right-3 bottom-2 hover:scale-110 transition-transform"
-                    >
-                      <Smile className="w-5 h-5 text-gray-400" />
-                    </button>
                   </div>
                   <button
                     onClick={() => void handleSendMessage()}
@@ -547,6 +631,15 @@ export function MessagesView({
           )}
         </div>
       </div>
+      <PostDetailModal
+        isOpen={!!selectedSharedPostId}
+        postId={selectedSharedPostId || ''}
+        onClose={() => setSelectedSharedPostId(null)}
+        onOpenProfile={(id) => {
+          setSelectedSharedPostId(null);
+          if (onOpenProfile) onOpenProfile(id);
+        }}
+      />
     </div>
   );
 }

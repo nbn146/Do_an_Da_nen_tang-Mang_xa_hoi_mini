@@ -22,10 +22,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response) {
-      console.error(
-        `[API] ${error.response.status} — ${error.config?.url}`,
-        error.response.data?.message,
-      );
+      console.error(`[API] ${error.response.status} — ${error.config?.url}`, error.response.data?.message);
     } else if (error.request) {
       console.error("[API] No response — check network/IP:", error.config?.url);
     }

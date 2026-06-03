@@ -1,23 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
-import {
-  View,
-  Text,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Alert,
-} from "react-native";
+import { View, Text, Pressable, RefreshControl, StyleSheet } from "react-native";
 import { FlashList } from "@shopify/flash-list";
-import {
-  Heart,
-  MessageCircle,
-  UserPlus,
-  AtSign,
-  Share2,
-  CheckCheck,
-  Clock,
-  X,
-} from "lucide-react-native";
+import { Heart, MessageCircle, UserPlus, AtSign, CheckCheck, Clock } from "lucide-react-native";
 import { Image } from "expo-image";
 import { api } from "../api/client";
 import { ENDPOINTS } from "../api/endpoints";
@@ -50,7 +34,7 @@ const getNotificationText = (type: string, t: (vi: string, en: string) => string
   }
 };
 
-export default function NotificationsScreen() {
+export default function NotificationsScreen({ navigation }: any) {
   const { t } = useLanguage();
   const { socket } = useSocketContext();
   const navigation: any = useNavigation();
@@ -112,14 +96,35 @@ export default function NotificationsScreen() {
     }
   }, []);
 
-  const deleteNotification = useCallback(async (id: string) => {
-    try {
-      await api.delete(ENDPOINTS.NOTIFICATION_DELETE(id));
-      setNotifications((prev) => prev.filter((n) => n._id !== id));
-    } catch (e) {
-      console.error("[NotificationsScreen] Delete error:", e);
+  const handleOpenNotification = useCallback((notification: INotification) => {
+    // 1. Đánh dấu đã đọc
+    if (!notification.is_read) {
+      markAsRead(notification._id);
     }
-  }, []);
+
+    // 2. Điều hướng theo loại notification
+    if (notification.type === "follow") {
+      // Follow → Mở trang cá nhân người follow mình
+      const sender = typeof notification.sender_id === "object"
+        ? notification.sender_id
+        : null;
+      const profileId = (sender as IUser | null)?._id || notification.target_id;
+      if (profileId) {
+        navigation.navigate("UserProfile", { userId: profileId });
+      }
+      return;
+    }
+
+    // Like / Comment / Mention → Mở bài viết
+    if (
+      (notification.type === "like" ||
+        notification.type === "comment" ||
+        notification.type === "mention") &&
+      notification.target_id
+    ) {
+      navigation.navigate("PostDetail", { postId: notification.target_id });
+    }
+  }, [markAsRead, navigation]);
 
   const renderItem = useCallback(({ item }: { item: INotification }) => {
     const sender = (typeof item.sender_id === "object" ? item.sender_id : null) as IUser | null;
@@ -148,7 +153,7 @@ export default function NotificationsScreen() {
 
     return (
       <Pressable
-        onPress={handlePress}
+        onPress={() => handleOpenNotification(item)}
         style={[
           styles.notifRow,
           !item.is_read ? styles.notifUnread : null,
@@ -173,19 +178,9 @@ export default function NotificationsScreen() {
           </View>
         </View>
         {!item.is_read ? <View style={styles.unreadDot} /> : null}
-        <Pressable
-          onPress={(e) => {
-            e.stopPropagation();
-            deleteNotification(item._id);
-          }}
-          hitSlop={8}
-          style={styles.deleteBtn}
-        >
-          <X color={palette.muted} size={14} />
-        </Pressable>
       </Pressable>
     );
-  }, [markAsRead, t, navigation, deleteNotification]);
+  }, [markAsRead, t, navigation]);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
@@ -281,11 +276,6 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 5,
     backgroundColor: palette.primary,
-    alignSelf: "center",
-    marginLeft: 8,
-  },
-  deleteBtn: {
-    padding: 8,
     alignSelf: "center",
     marginLeft: 8,
   },

@@ -5,21 +5,17 @@ import { useSocketEvent } from "./useSocket";
 export interface INotification {
   _id: string;
   recipient_id: string;
-  sender_id:
-    | {
-        _id: string;
-        username: string;
-        display_name: string;
-        avatar?: string;
-      }
-    | string;
-  type: "like" | "comment" | "follow" | "mention" | "share";
-  reference_id?: string;
-  reference_model?: "Post" | "Comment";
-  content?: string;
+  sender_id: {
+    _id: string;
+    username: string;
+    display_name: string;
+    avatar_url?: string;
+  } | string;
+  type: "like" | "comment" | "follow" | "mention" | "system";
+  target_id?: string | null;
+  message?: string;
   is_read: boolean;
-  createdAt: string;
-  updatedAt: string;
+  created_at: string;
 }
 
 /**
@@ -33,7 +29,7 @@ export function useNotifications() {
 
   // Fetch danh sách notifications từ REST API
   const fetchNotifications = useCallback(async () => {
-    const token = localStorage.getItem("userToken");
+    const token = localStorage.getItem('userToken');
     if (!token) {
       setIsLoading(false);
       return; // Không fetch khi chưa đăng nhập
@@ -84,19 +80,11 @@ export function useNotifications() {
   const markAllAsRead = useCallback(async () => {
     try {
       await apiClient.patch("/notifications/read-all");
-      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      setNotifications((prev) =>
+        prev.map((n) => ({ ...n, is_read: true })),
+      );
     } catch (err) {
       console.error("Lỗi đánh dấu tất cả đã đọc:", err);
-    }
-  }, []);
-
-  // Xóa 1 notification
-  const deleteNotification = useCallback(async (notificationId: string) => {
-    try {
-      await apiClient.delete(`/notifications/${notificationId}`);
-      setNotifications((prev) => prev.filter((n) => n._id !== notificationId));
-    } catch (err) {
-      console.error("Lỗi xóa thông báo:", err);
     }
   }, []);
 
@@ -110,7 +98,6 @@ export function useNotifications() {
     unreadCount,
     markAsRead,
     markAllAsRead,
-    deleteNotification,
     refetch: fetchNotifications,
   };
 }
