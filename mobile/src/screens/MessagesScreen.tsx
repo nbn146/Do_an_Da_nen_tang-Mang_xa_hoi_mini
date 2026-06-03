@@ -1,6 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
-import { io, Socket } from "socket.io-client";
 import { BASE_URL } from "../api/config";
+
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Linking,
 } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import {
@@ -20,21 +21,25 @@ import {
   Send,
   ArrowLeft,
   Image as ImageIcon,
+  Paperclip,
 } from "lucide-react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { api } from "../api/client";
-import { ENDPOINTS } from "../api/endpoint";
+import { ENDPOINTS } from "../api/endpoints";
 import { useAuth } from "../store/AuthContext";
 import { useLanguage } from "../store/LanguageContext";
+import { useSocketContext } from "../store/SocketContext";
 import { ui, palette } from "../theme";
 import { ScreenGradient } from "../components/common/ScreenGradient";
 
 const FlashListAny = FlashList as any;
 
+
 export default function MessagesScreen({ route }: any) {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { socket } = useSocketContext();
   const [conversations, setConversations] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -44,86 +49,33 @@ export default function MessagesScreen({ route }: any) {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const initialConversationId = route?.params?.initialConversationId;
   // ✅ 2. ⚡️ ĐẶT HÀM Ở ĐÂY (Ngay dưới import, trên function MessagesScreen)
-  // Hàm này giúp biến hình link localhost thành link IP thật trỏ về MinIO (cổng 9000)
-  const getValidMediaUrl = (url?: string) => {
-    if (!url) return "";
+// Hàm này giúp biến hình link localhost thành link IP thật trỏ về MinIO (cổng 9000)
+const getValidMediaUrl = (url?: string) => {
+  if (!url) return "";
+  
+  // Đổi TOÀN BỘ dấu gạch chéo ngược \ của Windows thành gạch chéo xuôi /
+  let formattedUrl = url.replace(/\\/g, '/');
+  
+  // Tính MinIO host từ BASE_URL (port 9000). Giữ fallback nếu parsing lỗi.
+  let MINIO_URL = "http://192.168.0.101:9000";
+  try {
+    const parsed = new URL(BASE_URL);
+    MINIO_URL = `${parsed.protocol}//${parsed.hostname}:9000`;
+  } catch (e) {
+    // fallback giữ nguyên
+  }
 
-    // Đổi TOÀN BỘ dấu gạch chéo ngược \ của Windows thành gạch chéo xuôi /
-    let formattedUrl = url.replace(/\\/g, "/");
-
-    // Tính MinIO host từ BASE_URL (port 9000). Giữ fallback nếu parsing lỗi.
-    let MINIO_URL = "http://192.168.0.101:9000";
-    try {
-      const parsed = new URL(BASE_URL);
-      MINIO_URL = `${parsed.protocol}//${parsed.hostname}:9000`;
-    } catch (e) {
-      // fallback giữ nguyên
-    }
-
-    // Nếu link chứa localhost hoặc 127.0.0.1, ép nó về MINIO_URL
-    if (
-      formattedUrl.includes("localhost") ||
-      formattedUrl.includes("127.0.0.1")
-    ) {
-      formattedUrl = formattedUrl.replace(/http:\/\/[^/]+/g, MINIO_URL);
-    }
-    // Nếu là đường dẫn tương đối (/messages/...) -> Nối MINIO_URL vào đầu
-    else if (!formattedUrl.startsWith("http")) {
-      formattedUrl = `${MINIO_URL}${formattedUrl.startsWith("/") ? "" : "/"}${formattedUrl}`;
-    }
-
-    return formattedUrl;
-  };
-
-  const socketRef = useRef<Socket | null>(null);
-
-  useEffect(() => {
-    // Lấy token JWT từ API client headers để xác thực socket
-    const authHeader = (api.defaults.headers.common as any)?.Authorization;
-    const token =
-      typeof authHeader === "string"
-        ? authHeader.replace("Bearer ", "")
-        : null;
-
-    if (!token) return;
-
-    // 1. Kết nối Socket.IO với xác thực JWT
-    const socket = io(BASE_URL, {
-      auth: { token },
-      transports: ["websocket"],
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-    });
-    socketRef.current = socket;
-
-    // 2. Tham gia phòng chat hiện tại (đúng event name backend)
-    if (selectedConvId) {
-      socket.emit("joinConversation", { conversationId: selectedConvId });
-    }
-
-    // 3. Lắng nghe tin nhắn mới từ backend (event: newMessage)
-    socket.on("newMessage", (payload: any) => {
-      const msg = payload.message || payload;
-      const convId = payload.conversationId || msg.conversationId;
-      if (convId === selectedConvId) {
-        setMessages((prev: any[]) => {
-          const isExist = prev.some((m: any) => m._id === msg._id);
-          return isExist ? prev : [...prev, msg];
-        });
-      }
-      // Cập nhật danh sách conversations khi có tin nhắn mới
-      loadConversations();
-    });
-
-    // 4. Dọn dẹp khi thoát phòng chat
-    return () => {
-      if (selectedConvId) {
-        socket.emit("leaveConversation", { conversationId: selectedConvId });
-      }
-      socket.disconnect();
-    };
-  }, [selectedConvId, loadConversations]);
+  // Nếu link chứa localhost hoặc 127.0.0.1, ép nó về MINIO_URL
+  if (formattedUrl.includes("localhost") || formattedUrl.includes("127.0.0.1")) {
+    formattedUrl = formattedUrl.replace(/http:\/\/[^/]+/g, MINIO_URL);
+  }
+  // Nếu là đường dẫn tương đối (/messages/...) -> Nối MINIO_URL vào đầu
+  else if (!formattedUrl.startsWith("http")) {
+    formattedUrl = `${MINIO_URL}${formattedUrl.startsWith('/') ? '' : '/'}${formattedUrl}`;
+  }
+  
+  return formattedUrl;
+};
 
   const loadConversations = useCallback(async () => {
     try {
@@ -161,6 +113,22 @@ export default function MessagesScreen({ route }: any) {
       console.error(e);
     }
   }, []);
+  // Polling fallback — chỉ giữ 1 interval (tránh duplicate request)
+  useEffect(() => {
+    let intervalId: any;
+
+    if (selectedConvId) {
+      intervalId = setInterval(() => {
+        loadMessages(selectedConvId);
+      }, 3000);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [selectedConvId, loadMessages]);
 
 
   const markConversationRead = useCallback(async (convId: string) => {
@@ -175,6 +143,65 @@ export default function MessagesScreen({ route }: any) {
       console.error(e);
     }
   }, []);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewMessage = (payload: any) => {
+      const incoming = payload?.message || payload;
+      const conversationId =
+        payload?.conversationId || incoming?.conversationId || incoming?.conversation;
+
+      if (!conversationId || !incoming?._id) return;
+
+      if (conversationId === selectedConvId) {
+        setMessages((prev) =>
+          prev.some((msg) => msg._id === incoming._id) ? prev : [...prev, incoming],
+        );
+        void markConversationRead(conversationId).then(loadConversations);
+        return;
+      }
+
+      // Nếu tin nhắn đến cho conversation khác, tăng unreadCount cục bộ để hiển thị ngay
+      setConversations((prev) => {
+        let found = false;
+        const next = prev.map((conv) => {
+          if (conv._id === conversationId) {
+            found = true;
+            return {
+              ...conv,
+              unreadCount: (conv.unreadCount || 0) + 1,
+              lastMessage: incoming,
+            };
+          }
+          return conv;
+        });
+
+        // Nếu không tìm thấy conversation trong list hiện tại, trigger reload để lấy dữ liệu mới từ server
+        if (!found) {
+          // tối ưu: vẫn trả về prev để không mất dữ liệu UI, loadConversations sẽ cập nhật sau
+          void loadConversations();
+          return prev;
+        }
+
+        // Đồng thời lấy lại danh sách từ server để đồng bộ (không block UI)
+        void loadConversations();
+        return next;
+      });
+    };
+
+    if (selectedConvId) {
+      socket.emit("joinConversation", { conversationId: selectedConvId });
+    }
+    socket.on("newMessage", handleNewMessage);
+
+    return () => {
+      socket.off("newMessage", handleNewMessage);
+      if (selectedConvId) {
+        socket.emit("leaveConversation", { conversationId: selectedConvId });
+      }
+    };
+  }, [loadConversations, markConversationRead, selectedConvId, socket]);
 
   useEffect(() => {
     if (selectedConvId) {
@@ -200,13 +227,13 @@ export default function MessagesScreen({ route }: any) {
 
   const handlePickImage = useCallback(async () => {
     if (!selectedConvId || isUploadingImage) return;
-
+    
     // Đã cập nhật mediaTypes thành mảng theo chuẩn mới của Expo
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
+      mediaTypes: ['images'], 
       quality: 0.7, // Nén nhẹ xuống 70% để upload nhanh hơn, tránh timeout
     });
-
+    
     if (result.canceled) return;
 
     try {
@@ -217,11 +244,10 @@ export default function MessagesScreen({ route }: any) {
 
       // 1. Tự động lấy tên và loại file chuẩn xác, không fix cứng JPG nữa
       const fileName = asset.fileName || `image_${Date.now()}.jpg`;
-      const mimeType = asset.mimeType || "image/jpeg";
-
+      const mimeType = asset.mimeType || 'image/jpeg';
+      
       // 2. Lọc đường dẫn an toàn cho cả iOS và Android
-      const fileUri =
-        Platform.OS === "ios" ? asset.uri.replace("file://", "") : asset.uri;
+      const fileUri = Platform.OS === 'ios' ? asset.uri.replace('file://', '') : asset.uri;
 
       formData.append("file", {
         uri: fileUri,
@@ -230,26 +256,19 @@ export default function MessagesScreen({ route }: any) {
       });
 
       // 3. Ghi đè cấu hình Axios riêng cho lệnh Upload này
-      const res = await api.post(
-        ENDPOINTS.MESSAGE_UPLOAD(selectedConvId),
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-          timeout: 30000,
+      const res = await api.post(ENDPOINTS.MESSAGE_UPLOAD(selectedConvId), formData, {
+        headers: { 
+          "Content-Type": "multipart/form-data",
         },
-      );
+        timeout: 30000, 
+      });
 
       const newMsg = res.data.data || res.data;
       setMessages((prev) => [...prev, newMsg]);
       void loadConversations();
     } catch (e: any) {
       console.error("[Upload Ảnh Lỗi]:", e.message || e);
-      Alert.alert(
-        t("Gửi ảnh", "Send image"),
-        t("Không thể gửi ảnh. Vui lòng thử lại.", "Could not send image."),
-      );
+      Alert.alert(t("Gửi ảnh", "Send image"), t("Không thể gửi ảnh. Vui lòng thử lại.", "Could not send image."));
     } finally {
       setIsUploadingImage(false);
     }
@@ -306,9 +325,7 @@ export default function MessagesScreen({ route }: any) {
             </Text>
             {lastMsg?.createdAt ? (
               <Text style={{ fontSize: 12, color: palette.muted }}>
-                {new Date(lastMsg.createdAt).toLocaleDateString(
-                  t("vi-VN", "en-US"),
-                )}
+                {new Date(lastMsg.createdAt).toLocaleDateString(t("vi-VN", "en-US"))}
               </Text>
             ) : null}
           </View>
@@ -319,8 +336,7 @@ export default function MessagesScreen({ route }: any) {
               style={{ color: palette.muted, fontSize: 14 }}
               numberOfLines={1}
             >
-              {lastMsg?.content ||
-                t("Bắt đầu cuộc trò chuyện...", "Start a conversation...")}
+              {lastMsg?.content || t("Bắt đầu cuộc trò chuyện...", "Start a conversation...")}
             </Text>
             {unread > 0 ? (
               <View
@@ -410,14 +426,12 @@ export default function MessagesScreen({ route }: any) {
               ref={scrollViewRef}
               style={{ flex: 1, padding: 16 }}
               contentContainerStyle={{ paddingBottom: 16 }}
+              
               // 1. Tự cuộn xuống khi có tin nhắn mới (Đã có từ trước)
-              onContentSizeChange={() =>
-                scrollViewRef.current?.scrollToEnd({ animated: true })
-              }
+              onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+              
               // ⚡️ 2. THÊM DÒNG NÀY: Tự cuộn xuống NGAY LẬP TỨC khi vừa vẽ xong giao diện phòng chat
-              onLayout={() =>
-                scrollViewRef.current?.scrollToEnd({ animated: false })
-              } // Để false cho nó xuất hiện ở đáy luôn, không bị hiệu ứng trượt làm rối mắt lúc mới vào
+              onLayout={() => scrollViewRef.current?.scrollToEnd({ animated: false })} // Để false cho nó xuất hiện ở đáy luôn, không bị hiệu ứng trượt làm rối mắt lúc mới vào
             >
               {messages.length === 0 ? (
                 <Text
@@ -432,32 +446,30 @@ export default function MessagesScreen({ route }: any) {
               ) : (
                 messages.map((msg, idx) => {
                   // ✅ ĐOẠN CODE MỚI: Bọc thép mọi trường hợp
-                  // 1. Lấy ID của mình (Quét cả trường hợp ._id lẫn .id)
-                  const rawSender =
-                    msg.sender ||
-                    msg.author ||
-                    msg.userId ||
-                    msg.senderId ||
-                    msg.user;
+// 1. Lấy ID của mình (Quét cả trường hợp ._id lẫn .id)
+const rawSender = msg.sender || msg.author || msg.userId || msg.senderId || msg.user;
 
-                  // 2. Trích xuất ID từ biến vừa tìm được
-                  const senderId =
-                    typeof rawSender === "string"
-                      ? rawSender
-                      : rawSender?._id || rawSender?.id;
+// 2. Trích xuất ID từ biến vừa tìm được
+const senderId = typeof rawSender === "string" 
+  ? rawSender 
+  : (rawSender?._id || rawSender?.id);
+  
+// 3. Lấy ID của bạn (như cũ)
+const currentUserId = (user as any)?._id || (user as any)?.id;
 
-                  // 3. Lấy ID của bạn (như cũ)
-                  const currentUserId = (user as any)?._id || (user as any)?.id;
-
-                  // 4. Ép kiểu và so sánh
-                  const isOwn = Boolean(
-                    senderId &&
-                    currentUserId &&
-                    String(senderId) === String(currentUserId),
-                  );
+// 4. Ép kiểu và so sánh
+const isOwn = Boolean(
+  senderId && 
+  currentUserId && 
+  String(senderId) === String(currentUserId)
+);
+const messageType = msg.messageType || "text";
+const mediaUrl = msg.mediaUrl ? getValidMediaUrl(msg.mediaUrl) : "";
+const content = msg.content || "";
+const createdAt = msg.createdAt || msg.created_at;
                   return (
                     <View
-                      key={idx}
+                      key={msg._id || `${selectedConvId}-${createdAt || idx}`}
                       style={{
                         flexDirection: "row",
                         justifyContent: isOwn ? "flex-end" : "flex-start",
@@ -480,27 +492,52 @@ export default function MessagesScreen({ route }: any) {
                           maxWidth: "80%",
                         }}
                       >
-                        {msg.messageType === "image" && msg.mediaUrl ? (
+                        {messageType === "image" && mediaUrl ? (
                           <Image
                             // ✅ CODE MỚI: Bọc qua hàm getValidMediaUrl
-                            source={{ uri: getValidMediaUrl(msg.mediaUrl) }}
+                            source={{ uri: mediaUrl }}
                             style={{
                               width: 220,
                               height: 180,
                               borderRadius: 12,
-                              marginBottom: msg.content ? 8 : 0,
+                              marginBottom: content ? 8 : 0,
                             }}
                             contentFit="cover"
                           />
                         ) : null}
-                        {msg.content ? (
+                        {messageType === "file" && mediaUrl ? (
+                          <Pressable
+                            onPress={() => void Linking.openURL(mediaUrl)}
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 8,
+                              maxWidth: 220,
+                              paddingVertical: 4,
+                            }}
+                          >
+                            <Paperclip color={isOwn ? "#fff" : palette.ink} size={16} />
+                            <Text
+                              numberOfLines={1}
+                              style={{
+                                color: isOwn ? "#fff" : palette.ink,
+                                flexShrink: 1,
+                                fontSize: 15,
+                                fontWeight: "600",
+                              }}
+                            >
+                              {content || t("Tệp đính kèm", "Attachment")}
+                            </Text>
+                          </Pressable>
+                        ) : null}
+                        {content && messageType !== "file" ? (
                           <Text
                             style={{
                               color: isOwn ? "#fff" : palette.ink,
                               fontSize: 15,
                             }}
                           >
-                            {msg.content}
+                            {content}
                           </Text>
                         ) : null}
                         <Text
@@ -513,13 +550,12 @@ export default function MessagesScreen({ route }: any) {
                             alignSelf: "flex-end",
                           }}
                         >
-                          {new Date(msg.createdAt).toLocaleTimeString(
-                            t("vi-VN", "en-US"),
-                            {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            },
-                          )}
+                          {createdAt
+                            ? new Date(createdAt).toLocaleTimeString(t("vi-VN", "en-US"), {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : ""}
                         </Text>
                       </LinearGradient>
                     </View>

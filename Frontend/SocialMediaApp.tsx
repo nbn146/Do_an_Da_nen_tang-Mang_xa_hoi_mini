@@ -1,235 +1,144 @@
+import { Calendar, Mail, Phone, Loader2 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
-import { Camera, Loader2, Smile, Video } from "lucide-react";
-import { toast } from "sonner";
-import { PostCard } from "./PostCard";
-import { CreatePostModal } from "./CreatePostModal";
 import apiClient from "../../services/api";
-import { useCurrentUser } from "../../hooks/useCurrentUser";
 import { useLangText } from "../../hooks/useLangText";
-import { sharePostLink } from "../../utils/share";
-import type { IPost } from "../../types/models";
+import type { IMyProfile } from "../../types/models";
 
-interface PostFeedProps {
-  onCreatePost?: () => void;
-  refreshKey?: number;
-  onOpenProfile?: (userId: string) => void;
+interface ProfileCardProps {
+  onEditProfile?: () => void;
 }
 
-export function PostFeed({ onCreatePost, refreshKey = 0, onOpenProfile }: PostFeedProps) {
-  const [posts, setPosts] = useState<IPost[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isLocalComposerOpen, setIsLocalComposerOpen] = useState(false);
-  const currentUser = useCurrentUser();
+export function ProfileCard({ onEditProfile }: ProfileCardProps) {
   const text = useLangText();
+  const [profile, setProfile] = useState<IMyProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const fetchPosts = useCallback(async () => {
+  const fetchProfile = useCallback(async () => {
     const token = localStorage.getItem("userToken");
     if (!token) {
       setIsLoading(false);
       return;
     }
     try {
-      setIsLoading(true);
-      const response = await apiClient.get("/post/feed");
-      const data = response.data.data;
-      setPosts(Array.isArray(data) ? data : data?.posts || []);
-      setError(null);
-    } catch (err: any) {
-      if (err.response?.status !== 401) {
-        setError(err.response?.data?.message || text("Lỗi tải bảng tin", "Could not load feed"));
-      }
+      const response = await apiClient.get("/users/me");
+      setProfile(response.data.data);
+    } catch (err) {
+      console.error("Lỗi tải profile card:", err);
     } finally {
       setIsLoading(false);
     }
-  }, [text]);
+  }, []);
 
   useEffect(() => {
-    fetchPosts();
-  }, [fetchPosts, refreshKey]);
-
-  const handleLike = useCallback(async (postId: string) => {
-    try {
-      const response = await apiClient.post(`/post/${postId}/react`);
-      const result = response.data.data;
-      setPosts((prev) =>
-        prev.map((post) =>
-          post._id === postId
-            ? {
-                ...post,
-                is_liked: result?.is_liked ?? !post.is_liked,
-                stats: {
-                  ...post.stats,
-                  likes:
-                    typeof result?.likes === "number"
-                      ? result.likes
-                      : Math.max(0, post.stats.likes + (post.is_liked ? -1 : 1)),
-                },
-              }
-            : post,
-        ),
-      );
-    } catch (err) {
-      console.error("Lỗi thích bài viết:", err);
-      toast.error(text("Không thể cập nhật lượt thích.", "Could not update like."));
-    }
-  }, [text]);
-
-  const handleCommentCreated = useCallback((postId: string) => {
-    setPosts((prev) =>
-      prev.map((post) =>
-        post._id === postId
-          ? { ...post, stats: { ...post.stats, comments: post.stats.comments + 1 } }
-          : post,
-      ),
-    );
-  }, []);
-
-  const handlePostUpdated = useCallback((updatedPost: IPost) => {
-    setPosts((prev) =>
-      prev.map((post) =>
-        post._id === updatedPost._id
-          ? { ...post, ...updatedPost, is_liked: post.is_liked }
-          : post,
-      ),
-    );
-  }, []);
-
-  const handlePostDeleted = useCallback((postId: string) => {
-    setPosts((prev) => prev.filter((post) => post._id !== postId));
-  }, []);
-
-  const handleShare = useCallback(async (postId: string) => {
-    try {
-      const response = await apiClient.post(`/post/${postId}/share`);
-      const shares = response.data.data?.shares;
-      setPosts((prev) =>
-        prev.map((post) =>
-          post._id === postId
-            ? {
-                ...post,
-                stats: {
-                  ...post.stats,
-                  shares: typeof shares === "number" ? shares : post.stats.shares + 1,
-                },
-              }
-            : post,
-        ),
-      );
-      await sharePostLink(postId);
-    } catch (err) {
-      console.error("Share failed:", err);
-      toast.error(text("Không thể chia sẻ bài viết.", "Could not share post."));
-    }
-  }, [text]);
-
-  const handleOpenCreatePost = useCallback(() => {
-    if (onCreatePost) {
-      onCreatePost();
-      return;
-    }
-    setIsLocalComposerOpen(true);
-  }, [onCreatePost]);
-
-  const userName = currentUser?.display_name || currentUser?.username || "U";
-  const userAvatar =
-    (currentUser as any)?.avatar_url ||
-    currentUser?.avatar ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=7c3aed&color=fff`;
+    fetchProfile();
+    const onRefreshProfile = () => {
+      fetchProfile();
+    };
+    window.addEventListener("profile:refresh", onRefreshProfile);
+    return () => {
+      window.removeEventListener("profile:refresh", onRefreshProfile);
+    };
+  }, [fetchProfile]);
 
   if (isLoading) {
     return (
-      <div className="space-y-6 pb-6">
-        <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg p-12 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
-          <span className="ml-3 text-gray-500">{text("Đang tải bảng tin...", "Loading feed...")}</span>
+      <div className="sticky top-20">
+        <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-gray-200/50 p-8 flex items-center justify-center">
+          <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
         </div>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="space-y-6 pb-6">
-        <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg p-12 text-center">
-          <p className="text-red-500">{error}</p>
-          <button
-            onClick={fetchPosts}
-            className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all"
-          >
-            {text("Thử lại", "Try again")}
-          </button>
-        </div>
-      </div>
-    );
-  }
+  if (!profile) return null;
+
+  const avatarUrl = profile.avatar_url
+    || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.display_name)}&background=7c3aed&color=fff&size=150`;
+
+  const joinDate = profile.created_at
+    ? new Date(profile.created_at).toLocaleDateString(text("vi-VN", "en-US"), { month: "long", year: "numeric" })
+    : "";
 
   return (
-    <>
-    <div className="space-y-6 pb-6">
-      <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg p-4 border border-gray-200/50">
-        <div className="flex items-center space-x-3">
-          <img src={userAvatar} alt="Your avatar" className="w-12 h-12 rounded-full object-cover" />
-          <input
-            type="text"
-            placeholder={text("Bạn đang nghĩ gì?", "What are you thinking?")}
-            className="flex-1 px-4 py-3 bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500"
-            readOnly
-            onClick={handleOpenCreatePost}
-          />
-        </div>
-        <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
+    <div className="sticky top-20">
+      <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-gray-200/50 overflow-hidden">
+        {/* Cover Image */}
+        <div className="h-24 bg-gradient-to-r from-purple-500 via-blue-500 to-pink-500"></div>
+        
+        {/* Profile Info */}
+        <div className="px-4 pb-4">
+          <div className="flex flex-col items-center -mt-12">
+            <img
+              src={avatarUrl}
+              alt={profile.display_name}
+              className="w-24 h-24 rounded-full object-cover ring-4 ring-white shadow-lg"
+            />
+            <h2 className="mt-3 font-bold text-gray-900">{profile.display_name}</h2>
+            <p className="text-sm text-gray-500">@{profile.username}</p>
+          </div>
+          
+          {/* Bio */}
+          <p className="text-sm text-gray-700 text-center mt-3 px-2">
+            {profile.bio || text("Đang sử dụng Social Mini", "Using Social Mini")}
+          </p>
+          
+          {/* Info — dữ liệu thật */}
+          <div className="mt-4 space-y-2 text-sm text-gray-600">
+            {profile.email ? (
+              <div className="flex items-center space-x-2">
+                <Mail className="w-4 h-4" />
+                <span>{profile.email}</span>
+              </div>
+            ) : null}
+            
+            {profile.phone_number ? (
+              <div className="flex items-center space-x-2">
+                <Phone className="w-4 h-4" />
+                <span>{profile.phone_number}</span>
+              </div>
+            ) : null}
+
+            {joinDate ? (
+              <div className="flex items-center space-x-2">
+                <Calendar className="w-4 h-4" />
+                <span>{text("Tham gia", "Joined")} {joinDate}</span>
+              </div>
+            ) : null}
+          </div>
+          
+          {/* Stats — dữ liệu thật */}
+          <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-3 gap-2 text-center">
+            <div>
+              <p className="font-bold text-gray-900">{profile.postsCount}</p>
+              <p className="text-xs text-gray-500">{text("Bài viết", "Posts")}</p>
+            </div>
+            <div>
+              <p className="font-bold text-gray-900">
+                {profile.followersCount >= 1000
+                  ? `${(profile.followersCount / 1000).toFixed(1)}K`
+                  : profile.followersCount}
+              </p>
+              <p className="text-xs text-gray-500">{text("Người theo dõi", "Followers")}</p>
+            </div>
+            <div>
+              <p className="font-bold text-gray-900">
+                {profile.followingCount >= 1000
+                  ? `${(profile.followingCount / 1000).toFixed(1)}K`
+                  : profile.followingCount}
+              </p>
+              <p className="text-xs text-gray-500">{text("Đang theo dõi", "Following")}</p>
+            </div>
+          </div>
+          
+          {/* Action Button */}
           <button
-            onClick={handleOpenCreatePost}
-            className="flex items-center space-x-2 px-4 py-2 hover:bg-gray-100 rounded-lg transition-all"
+            onClick={onEditProfile}
+            className="w-full mt-4 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
           >
-            <Camera className="w-5 h-5 text-green-600" />
-            <span className="text-sm text-gray-600 hidden sm:inline">{text("Ảnh", "Photo")}</span>
-          </button>
-          <button
-            onClick={handleOpenCreatePost}
-            className="flex items-center space-x-2 px-4 py-2 hover:bg-gray-100 rounded-lg transition-all"
-          >
-            <Video className="w-5 h-5 text-blue-600" />
-            <span className="text-sm text-gray-600 hidden sm:inline">Video</span>
-          </button>
-          <button
-            onClick={handleOpenCreatePost}
-            className="flex items-center space-x-2 px-4 py-2 hover:bg-gray-100 rounded-lg transition-all"
-          >
-            <Smile className="w-5 h-5 text-yellow-600" />
-            <span className="text-sm text-gray-600 hidden sm:inline">{text("Cảm xúc", "Feeling")}</span>
+            {text("Chỉnh sửa trang cá nhân", "Edit profile")}
           </button>
         </div>
       </div>
-
-      {posts.length === 0 ? (
-        <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg p-12 text-center">
-          <p className="text-gray-500 font-medium">{text("Chưa có bài viết nào", "No posts yet")}</p>
-          <p className="text-sm text-gray-400 mt-1">
-            {text("Hãy tạo bài viết đầu tiên hoặc theo dõi ai đó.", "Create the first post or follow someone.")}
-          </p>
-        </div>
-      ) : (
-        posts.map((post) => (
-          <PostCard
-            key={post._id}
-            post={post}
-            onLike={handleLike}
-            onCommentCreated={handleCommentCreated}
-            onShare={handleShare}
-            onPostUpdated={handlePostUpdated}
-            onPostDeleted={handlePostDeleted}
-            onOpenProfile={onOpenProfile}
-          />
-        ))
-      )}
     </div>
-    <CreatePostModal
-      isOpen={isLocalComposerOpen}
-      onClose={() => setIsLocalComposerOpen(false)}
-      onPostCreated={() => void fetchPosts()}
-    />
-    </>
   );
 }

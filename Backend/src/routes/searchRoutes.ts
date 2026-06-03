@@ -1,3 +1,4 @@
+
 import { Router } from "express";
 import { search } from "../controllers/searchController.js";
 import { verifyToken as protect } from "../middleware/authMiddleware.js";

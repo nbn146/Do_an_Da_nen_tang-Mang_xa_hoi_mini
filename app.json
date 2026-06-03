@@ -1,0 +1,7 @@
+{
+  "plugins": [
+    "expo-image",
+    "expo-secure-store",
+    "expo-video"
+  ]
+}

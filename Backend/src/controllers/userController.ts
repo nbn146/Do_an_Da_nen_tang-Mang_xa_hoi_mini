@@ -15,7 +15,7 @@ export const getUserProfile = async (
   res: Response,
 ): Promise<void> => {
   try {
-    const { id } = req.params; // ID của user cần xem profile
+    const { id } = req.params as { id: string }; // ID của user cần xem profile
 
     // Lấy thông tin user (giấu password đi)
     const user = await User.findById(id).select("-password");

@@ -1,15 +1,33 @@
 {
   "dependencies": {
+    "@hookform/resolvers": "^5.4.0",
+    "@react-navigation/native": "^7.2.5",
+    "@shopify/flash-list": "2.0.2",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
+    "expo": "^56.0.8",
+    "expo-image": "~56.0.9",
+    "expo-image-picker": "^56.0.15",
+    "expo-linear-gradient": "~56.0.4",
+    "expo-secure-store": "~56.0.4",
+    "expo-video": "~56.1.2",
     "express": "^5.2.1",
     "i18next": "^26.0.8",
     "i18next-http-middleware": "^3.9.6",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.5.0"
+    "jwt-decode": "^4.0.0",
+    "lucide-react-native": "^1.17.0",
+    "mongoose": "^9.5.0",
+    "react-hook-form": "^7.77.0",
+    "react-native": "0.85.3",
+    "react-native-safe-area-context": "^5.8.0",
+    "sonner": "^2.0.7",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/react": "^19.2.16",
+    "@types/react-dom": "^19.2.3",
     "nodemon": "^3.1.14"
   }
 }

@@ -1,63 +1,84 @@
 import * as Minio from 'minio';
 import sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
+import { env } from '../config/env.js';
 
+// 1. Cấu hình MinIO Client — đọc từ env, không hardcode credentials
 export const minioClient = new Minio.Client({
-  endPoint: 'localhost',
-  port: 9000,
+  endPoint: env.minioEndpoint,
+  port: env.minioPort,
   useSSL: false,
-  accessKey: 'admin',
-  secretKey: 'password123'
+  accessKey: env.minioAccessKey,
+  secretKey: env.minioSecretKey,
 });
 
 const BUCKET_NAME = 'social-media-posts';
 
-const ensureBucket = async (): Promise<void> => {
+/**
+ * Đảm bảo bucket tồn tại. Chạy 1 lần khi server khởi động.
+ */
+async function ensureBucket(): Promise<void> {
   const exists = await minioClient.bucketExists(BUCKET_NAME);
-  if (exists) return;
+  if (!exists) {
+    await minioClient.makeBucket(BUCKET_NAME, 'us-east-1');
+    // Set policy cho phép public read (để Frontend xem được ảnh)
+    const policy = {
+      Version: "2012-10-17",
+      Statement: [{
+        Action: ["s3:GetObject"],
+        Effect: "Allow",
+        Principal: "*",
+        Resource: [`arn:aws:s3:::${BUCKET_NAME}/*`]
+      }]
+    };
+    await minioClient.setBucketPolicy(BUCKET_NAME, JSON.stringify(policy));
+  }
+}
 
-  await minioClient.makeBucket(BUCKET_NAME, 'us-east-1');
-  const policy = {
-    Version: "2012-10-17",
-    Statement: [{
-      Action: ["s3:GetObject"],
-      Effect: "Allow",
-      Principal: "*",
-      Resource: [`arn:aws:s3:::${BUCKET_NAME}/*`]
-    }]
-  };
-  await minioClient.setBucketPolicy(BUCKET_NAME, JSON.stringify(policy));
-};
+// Khởi tạo bucket ngay khi module được import
+ensureBucket().catch(err => console.error("❌ MinIO bucket init error:", err));
 
+/**
+ * Nén ảnh sang WebP và upload lên MinIO.
+ * Luồng bắt buộc: Multer (memoryStorage) → Sharp (WebP) → MinIO
+ * @param fileBuffer - Buffer từ multer memoryStorage (req.file.buffer)
+ * @returns URL public của ảnh trên MinIO
+ */
 export const uploadAndCompressImage = async (fileBuffer: Buffer): Promise<string> => {
+  // BƯỚC NÉN WEBP: Đổi sang webp và nén chất lượng còn 80%
   const webpBuffer = await sharp(fileBuffer)
     .webp({ quality: 80 })
     .toBuffer();
 
   const fileName = `${uuidv4()}.webp`;
 
-  await ensureBucket();
+  // BƯỚC UPLOAD lên MinIO
   await minioClient.putObject(BUCKET_NAME, fileName, webpBuffer, webpBuffer.length, {
     'Content-Type': 'image/webp'
   });
 
-  return `http://localhost:9000/${BUCKET_NAME}/${fileName}`;
+  // Trả về URL để lưu vào MongoDB
+  return `http://${env.minioEndpoint}:${env.minioPort}/${BUCKET_NAME}/${fileName}`;
 };
 
+/**
+ * Upload file thô (không nén — dùng cho PDF, video, documents).
+ * @param fileBuffer - Buffer từ multer memoryStorage
+ * @param originalName - Tên gốc để lấy extension
+ * @param mimetype - MIME type gốc
+ * @returns URL public trên MinIO
+ */
 export const uploadRawFile = async (
   fileBuffer: Buffer,
   originalName: string,
-  mimeType: string,
+  mimetype: string,
 ): Promise<string> => {
-  const extension = originalName.includes(".")
-    ? originalName.split(".").pop()
-    : "bin";
-  const fileName = `${uuidv4()}.${extension}`;
+  const ext = originalName.split('.').pop() || 'bin';
+  const fileName = `${uuidv4()}.${ext}`;
 
-  await ensureBucket();
   await minioClient.putObject(BUCKET_NAME, fileName, fileBuffer, fileBuffer.length, {
-    'Content-Type': mimeType || 'application/octet-stream'
+    'Content-Type': mimetype,
   });
 
-  return `http://localhost:9000/${BUCKET_NAME}/${fileName}`;
+  return `http://${env.minioEndpoint}:${env.minioPort}/${BUCKET_NAME}/${fileName}`;
 };
