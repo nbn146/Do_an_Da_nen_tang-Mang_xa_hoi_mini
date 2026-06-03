@@ -250,18 +250,18 @@ export default function MessagesScreen({ route, navigation }: any) {
   }, [isUploadingImage, loadConversations, selectedConvId, t]);
 
   const filteredConversations = conversations.filter((conv) => {
-    const partner = conv.participants?.find((p: any) => p._id !== (user as any)?._id) || conv.participants?.[0];
+    const partner = conv.partner || conv.participants?.find((p: any) => p._id !== (user as any)?._id) || conv.participants?.[0];
     if (!partner) return false;
     const name = partner.display_name || partner.username || "";
     return name.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   const renderConversation = ({ item }: { item: any }) => {
-    const partner = item.participants?.find((p: any) => p._id !== (user as any)?._id) || item.participants?.[0];
+    const partner = item.partner || item.participants?.find((p: any) => p._id !== (user as any)?._id) || item.participants?.[0];
     const avatar =
       (partner?.avatar_url ? resolveMediaUrl(partner.avatar_url) : null) ||
       (partner?.avatar ? resolveMediaUrl(partner.avatar) : null) ||
-      `https://ui-avatars.com/api/?name=${encodeURIComponent(partner.display_name || partner.username)}&background=7c3aed&color=fff`;
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(partner?.display_name || partner?.username || "Ai đó")}&background=7c3aed&color=fff`;
     const lastMsg = item.lastMessage;
     const unread = item.unreadCount || 0;
 
@@ -337,7 +337,7 @@ export default function MessagesScreen({ route, navigation }: any) {
   const scrollViewRef = useRef<any>(null);
 
   const selectedConversation = conversations.find((c) => c._id === selectedConvId);
-  const selectedPartner = selectedConversation?.participants?.find((p: any) => p._id !== (user as any)?._id) || selectedConversation?.participants?.[0];
+  const selectedPartner = selectedConversation?.partner || selectedConversation?.participants?.find((p: any) => p._id !== (user as any)?._id) || selectedConversation?.participants?.[0];
 
   if (selectedConvId && selectedPartner) {
     const partnerAvatar =
