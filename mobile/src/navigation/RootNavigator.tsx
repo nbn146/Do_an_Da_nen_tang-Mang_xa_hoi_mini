@@ -26,6 +26,7 @@ import NotificationsScreen from "../screens/NotificationsScreen";
 import MessagesScreen from "../screens/MessagesScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 import PostDetailScreen from "../screens/PostDetailScreen";
+import ForgotPasswordScreen from "../screens/ForgotPasswordScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -181,6 +182,11 @@ export function Navigation() {
             name="Register"
             component={RegisterScreen}
             options={{ title: t("Đăng ký", "Register") }}
+          />
+          <Stack.Screen
+            name="ForgotPassword"
+            component={ForgotPasswordScreen}
+            options={{ title: t("Quên mật khẩu", "Forgot Password") }}
           />
         </>
       ) : (

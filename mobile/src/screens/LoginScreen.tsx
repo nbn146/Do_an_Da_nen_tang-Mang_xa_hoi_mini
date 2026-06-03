@@ -186,7 +186,9 @@ export default function LoginScreen({ navigation }: any) {
         <View style={styles.field}>
           <View style={styles.passwordHeader}>
             <Text style={styles.label}>{t("Mật khẩu", "Password")}</Text>
-            <Text style={styles.forgotLink}>{t("Quên mật khẩu", "Forgot password")}</Text>
+            <Pressable onPress={() => navigation.navigate("ForgotPassword")}>
+              <Text style={styles.forgotLink}>{t("Quên mật khẩu", "Forgot password")}</Text>
+            </Pressable>
           </View>
           <Controller
             control={control}

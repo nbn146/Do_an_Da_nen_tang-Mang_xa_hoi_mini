@@ -7,7 +7,7 @@ import { env } from '../config/env.js';
 export const minioClient = new Minio.Client({
   endPoint: env.minioEndpoint,
   port: env.minioPort,
-  useSSL: false,
+  useSSL: env.minioUseSSL,
   accessKey: env.minioAccessKey,
   secretKey: env.minioSecretKey,
 });
@@ -42,6 +42,34 @@ async function ensureBucket(): Promise<void> {
 // Khởi tạo bucket ngay khi module được import
 ensureBucket().catch(err => console.error("❌ MinIO bucket init error:", err));
 
+// Helper: putObject với retry/backoff để chịu được lỗi tạm thời (503, network)
+async function putObjectWithRetry(
+  bucket: string,
+  objectName: string,
+  buffer: Buffer,
+  size: number,
+  meta?: Record<string, string>
+): Promise<void> {
+  const maxRetries = 3;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      await minioClient.putObject(bucket, objectName, buffer, size, meta as any);
+      return;
+    } catch (err: any) {
+      const status = err?.statusCode;
+      const code = err?.code;
+      const isRetryable = (status && status >= 500) || code === 'ECONNREFUSED' || code === 'ENOTFOUND' || status === 503;
+      console.error(`MinIO upload error (attempt ${attempt + 1}/${maxRetries}):`, err?.message || err);
+      if (!isRetryable || attempt === maxRetries - 1) {
+        throw err; // non-retryable or last attempt
+      }
+      // exponential backoff
+      const delayMs = 500 * Math.pow(2, attempt);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
 /**
  * Nén ảnh sang WebP và upload lên MinIO.
  * Luồng bắt buộc: Multer (memoryStorage) → Sharp (WebP) → MinIO
@@ -57,7 +85,7 @@ export const uploadAndCompressImage = async (fileBuffer: Buffer): Promise<string
   const fileName = `${uuidv4()}.webp`;
 
   // BƯỚC UPLOAD lên MinIO
-  await minioClient.putObject(BUCKET_NAME, fileName, webpBuffer, webpBuffer.length, {
+  await putObjectWithRetry(BUCKET_NAME, fileName, webpBuffer, webpBuffer.length, {
     'Content-Type': 'image/webp'
   });
 
@@ -80,7 +108,7 @@ export const uploadRawFile = async (
   const ext = originalName.split('.').pop() || 'bin';
   const fileName = `${uuidv4()}.${ext}`;
 
-  await minioClient.putObject(BUCKET_NAME, fileName, fileBuffer, fileBuffer.length, {
+  await putObjectWithRetry(BUCKET_NAME, fileName, fileBuffer, fileBuffer.length, {
     'Content-Type': mimetype,
   });
 

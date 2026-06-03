@@ -79,8 +79,8 @@ app.use((req: Request, res: Response) => {
 });
 
 // Bắt đầu server ngay lập tức
-server.listen(PORT, () => {
-  console.log(`🚀 Server đang chạy tại http://localhost:${PORT}`);
+server.listen(PORT as number, "0.0.0.0", () => {
+  console.log(`🚀 Server đang chạy tại http://0.0.0.0:${PORT}`);
 });
 
 server.on("error", (err: NodeJS.ErrnoException) => {

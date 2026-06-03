@@ -31,6 +31,8 @@ import { useAuth } from "../store/AuthContext";
 import { useLanguage } from "../store/LanguageContext";
 import { useSocketContext } from "../store/SocketContext";
 import { ui, palette } from "../theme";
+import type { IPost, IUser } from "../types/models";
+import { resolveMediaUrl } from "../utils/media";
 import { ScreenGradient } from "../components/common/ScreenGradient";
 
 const FlashListAny = FlashList as any;
@@ -48,34 +50,7 @@ export default function MessagesScreen({ route, navigation }: any) {
   const [messageText, setMessageText] = useState("");
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const initialConversationId = route?.params?.initialConversationId;
-  // ✅ 2. ⚡️ ĐẶT HÀM Ở ĐÂY (Ngay dưới import, trên function MessagesScreen)
-// Hàm này giúp biến hình link localhost thành link IP thật trỏ về MinIO (cổng 9000)
-const getValidMediaUrl = (url?: string) => {
-  if (!url) return "";
-  
-  // Đổi TOÀN BỘ dấu gạch chéo ngược \ của Windows thành gạch chéo xuôi /
-  let formattedUrl = url.replace(/\\/g, '/');
-  
-  // Tính MinIO host từ BASE_URL (port 9000). Giữ fallback nếu parsing lỗi.
-  let MINIO_URL = "http://192.168.0.105:9000";
-  try {
-    const parsed = new URL(BASE_URL);
-    MINIO_URL = `${parsed.protocol}//${parsed.hostname}:9000`;
-  } catch (e) {
-    // fallback giữ nguyên
-  }
 
-  // Nếu link chứa localhost hoặc 127.0.0.1, ép nó về MINIO_URL
-  if (formattedUrl.includes("localhost") || formattedUrl.includes("127.0.0.1")) {
-    formattedUrl = formattedUrl.replace(/http:\/\/[^/]+/g, MINIO_URL);
-  }
-  // Nếu là đường dẫn tương đối (/messages/...) -> Nối MINIO_URL vào đầu
-  else if (!formattedUrl.startsWith("http")) {
-    formattedUrl = `${MINIO_URL}${formattedUrl.startsWith('/') ? '' : '/'}${formattedUrl}`;
-  }
-  
-  return formattedUrl;
-};
 
   const loadConversations = useCallback(async () => {
     try {
@@ -275,18 +250,17 @@ const getValidMediaUrl = (url?: string) => {
   }, [isUploadingImage, loadConversations, selectedConvId, t]);
 
   const filteredConversations = conversations.filter((conv) => {
-    const partner = conv.partner;
+    const partner = conv.participants?.find((p: any) => p._id !== (user as any)?._id) || conv.participants?.[0];
     if (!partner) return false;
     const name = partner.display_name || partner.username || "";
     return name.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   const renderConversation = ({ item }: { item: any }) => {
-    const partner = item.partner;
-    if (!partner) return null;
+    const partner = item.participants?.find((p: any) => p._id !== (user as any)?._id) || item.participants?.[0];
     const avatar =
-      partner.avatar_url ||
-      partner.avatar ||
+      (partner?.avatar_url ? resolveMediaUrl(partner.avatar_url) : null) ||
+      (partner?.avatar ? resolveMediaUrl(partner.avatar) : null) ||
       `https://ui-avatars.com/api/?name=${encodeURIComponent(partner.display_name || partner.username)}&background=7c3aed&color=fff`;
     const lastMsg = item.lastMessage;
     const unread = item.unreadCount || 0;
@@ -362,14 +336,13 @@ const getValidMediaUrl = (url?: string) => {
   };
   const scrollViewRef = useRef<any>(null);
 
-  const selectedPartner = conversations.find(
-    (c) => c._id === selectedConvId,
-  )?.partner;
+  const selectedConversation = conversations.find((c) => c._id === selectedConvId);
+  const selectedPartner = selectedConversation?.participants?.find((p: any) => p._id !== (user as any)?._id) || selectedConversation?.participants?.[0];
 
   if (selectedConvId && selectedPartner) {
     const partnerAvatar =
-      selectedPartner.avatar_url ||
-      selectedPartner.avatar ||
+      (selectedPartner?.avatar_url ? resolveMediaUrl(selectedPartner.avatar_url) : null) ||
+      (selectedPartner?.avatar ? resolveMediaUrl(selectedPartner.avatar) : null) ||
       `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedPartner.display_name || selectedPartner.username)}&background=7c3aed&color=fff`;
     return (
       <ScreenGradient>
@@ -464,7 +437,7 @@ const isOwn = Boolean(
   String(senderId) === String(currentUserId)
 );
 const messageType = msg.messageType || "text";
-const mediaUrl = msg.mediaUrl ? getValidMediaUrl(msg.mediaUrl) : "";
+const mediaUrl = msg.mediaUrl ? resolveMediaUrl(msg.mediaUrl) : "";
 const content = msg.content || "";
 const createdAt = msg.createdAt || msg.created_at;
 const sharedPost = msg.sharedPostId;
@@ -545,16 +518,16 @@ const sharedPost = msg.sharedPostId;
                           >
                             <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
                               <Image 
-                                source={{ uri: sharedPost.author_id?.avatar_url || `https://ui-avatars.com/api/?name=${sharedPost.author_id?.username || 'User'}` }} 
-                                style={{ width: 24, height: 24, borderRadius: 12, marginRight: 8 }}
+                                source={{ uri: resolveMediaUrl(sharedPost.author_id?.avatar_url) || `https://ui-avatars.com/api/?name=${sharedPost.author_id?.username || 'User'}` }} 
+                                style={{ width: 16, height: 16, borderRadius: 8, marginRight: 4 }}
                               />
                               <Text style={{ fontSize: 12, fontWeight: "bold", color: isOwn ? "#fff" : palette.ink }}>
                                 {sharedPost.author_id?.display_name || sharedPost.author_id?.username || "User"}
                               </Text>
                             </View>
-                            <Text numberOfLines={2} style={{ fontSize: 13, color: isOwn ? "#fff" : palette.ink }}>
-                              {sharedPost.content || t('Đã chia sẻ một bài viết', 'Shared a post')}
-                            </Text>
+                              <Text style={{ fontSize: 13, color: isOwn ? "#fff" : palette.ink, marginTop: 4 }} numberOfLines={2}>
+                                {sharedPost.content || t('Đã chia sẻ một bài viết', 'Shared a post')}
+                              </Text>
                             {sharedPost.media && sharedPost.media.length > 0 && (
                               <Text style={{ fontSize: 11, fontStyle: 'italic', marginTop: 4, color: isOwn ? "rgba(255,255,255,0.8)" : palette.muted }}>
                                 {t('[Đính kèm hình ảnh/video]', '[Media attached]')}

@@ -40,6 +40,7 @@ import { useAuth } from "../store/AuthContext";
 import { useLanguage } from "../store/LanguageContext";
 import { palette } from "../theme";
 import type { ApiResponse, IUser } from "../types/models";
+import { resolveMediaUrl } from "../utils/media";
 
 type SettingsScreenMode =
   | "main"
@@ -206,7 +207,7 @@ export default function SettingsScreen() {
   const userData = profile || user;
   const avatarUrl =
     avatarUri ||
-    userData?.avatar_url ||
+    (userData?.avatar_url ? resolveMediaUrl(userData.avatar_url) : null) ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(
       userData?.display_name || userData?.username || "U",
     )}&background=7c3aed&color=fff`;
@@ -265,7 +266,6 @@ export default function SettingsScreen() {
       const res = await api.put<ApiResponse<IUser>>(
         ENDPOINTS.UPDATE_PROFILE,
         formData,
-        { headers: { "Content-Type": "multipart/form-data" } },
       );
       const updated = res.data.data;
       setProfile((prev) => ({
