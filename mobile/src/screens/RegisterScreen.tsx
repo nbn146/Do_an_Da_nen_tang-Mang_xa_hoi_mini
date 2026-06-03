@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Pressable, Text, TextInput, View, StyleSheet, Alert } from "react-native";
-import { Mail, Lock, User, AtSign, ArrowRight, Eye, EyeOff, Send } from "lucide-react-native";
+import { Mail, Lock, User, AtSign, ArrowRight, Eye, EyeOff, Send, Phone } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,13 +11,21 @@ import { api } from "../api/client";
 import { ENDPOINTS } from "../api/endpoints";
 import { ui, palette } from "../theme";
 import { ScreenGradient } from "../components/common/ScreenGradient";
+import { getAccountType } from "../utils/validators";
 
 type RegisterFormData = {
   username: string;
   display_name: string;
-  email: string;
+  contact: string;
   password: string;
   otp: string;
+};
+
+type ContactType = "email" | "phone";
+
+const normalizeContact = (value: string, type: ContactType) => {
+  const trimmed = value.trim();
+  return type === "phone" ? trimmed.replace(/\s/g, "") : trimmed.toLowerCase();
 };
 
 export default function RegisterScreen({ navigation }: any) {
@@ -26,6 +34,7 @@ export default function RegisterScreen({ navigation }: any) {
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState("");
   const [otpSent, setOtpSent] = useState(false);
+  const [otpTarget, setOtpTarget] = useState("");
   const [sendingOtp, setSendingOtp] = useState(false);
   const registerSchema = useMemo(
     () =>
@@ -39,10 +48,13 @@ export default function RegisterScreen({ navigation }: any) {
           .string()
           .min(1, t("Vui lòng nhập tên hiển thị", "Please enter a display name"))
           .max(50, t("Tên hiển thị tối đa 50 ký tự", "Display name must be at most 50 characters")),
-        email: z
+        contact: z
           .string()
-          .min(1, t("Vui lòng nhập email", "Please enter an email"))
-          .email(t("Email không hợp lệ", "Invalid email")),
+          .min(1, t("Vui lòng nhập email hoặc số điện thoại", "Please enter an email or phone number"))
+          .refine(
+            (value) => getAccountType(value) !== "unknown",
+            t("Email hoặc số điện thoại không hợp lệ", "Invalid email or phone number"),
+          ),
         password: z
           .string()
           .min(6, t("Mật khẩu phải có ít nhất 6 ký tự", "Password must be at least 6 characters")),
@@ -63,24 +75,30 @@ export default function RegisterScreen({ navigation }: any) {
     defaultValues: {
       username: "",
       display_name: "",
-      email: "",
+      contact: "",
       password: "",
       otp: "",
     },
   });
 
   const sendOtp = async () => {
-    const email = getValues("email");
-    if (!email || !email.includes("@")) {
-      setServerError(t("Vui lòng nhập email hợp lệ trước khi gửi OTP", "Please enter a valid email before sending OTP"));
+    const rawContact = getValues("contact");
+    const contactType = getAccountType(rawContact);
+    if (contactType === "unknown") {
+      setServerError(t("Vui lòng nhập email hoặc số điện thoại hợp lệ trước khi gửi OTP", "Please enter a valid email or phone number before sending OTP"));
       return;
     }
+    const contact = normalizeContact(rawContact, contactType);
     try {
       setSendingOtp(true);
       setServerError("");
-      await api.post(ENDPOINTS.SEND_EMAIL_OTP, { email });
+      await api.post(
+        contactType === "phone" ? ENDPOINTS.SEND_PHONE_OTP : ENDPOINTS.SEND_EMAIL_OTP,
+        contactType === "phone" ? { phone_number: contact } : { email: contact },
+      );
       setOtpSent(true);
-      Alert.alert(t("Thành công", "Success"), t("Mã OTP đã được gửi đến email của bạn", "OTP has been sent to your email"));
+      setOtpTarget(contact);
+      Alert.alert(t("Thành công", "Success"), t("Mã OTP đã được gửi đến thông tin liên hệ của bạn", "OTP has been sent to your contact"));
     } catch (error: any) {
       setServerError(error.response?.data?.message || t("Gửi OTP thất bại", "Failed to send OTP"));
     } finally {
@@ -94,10 +112,20 @@ export default function RegisterScreen({ navigation }: any) {
       setServerError(t("Vui lòng gửi mã OTP trước khi đăng ký", "Please send OTP before registering"));
       return;
     }
+    const contactType = getAccountType(data.contact);
+    if (contactType === "unknown") {
+      setServerError(t("Email hoặc số điện thoại không hợp lệ", "Invalid email or phone number"));
+      return;
+    }
+    const contact = normalizeContact(data.contact, contactType);
+    if (otpTarget && contact !== otpTarget) {
+      setServerError(t("Vui lòng gửi lại OTP cho email hoặc số điện thoại này", "Please resend OTP for this email or phone number"));
+      return;
+    }
     const result = await register({
       username: data.username.trim(),
       display_name: data.display_name.trim(),
-      email: data.email.trim(),
+      ...(contactType === "phone" ? { phone_number: contact } : { email: contact }),
       password: data.password,
       otp: data.otp.trim(),
     });
@@ -169,30 +197,34 @@ export default function RegisterScreen({ navigation }: any) {
           ) : null}
         </View>
 
-        {/* Email */}
+        {/* Email or phone */}
         <View style={styles.field}>
-          <Text style={styles.label}>Email</Text>
+          <Text style={styles.label}>{t("Email hoặc số điện thoại", "Email or phone number")}</Text>
           <Controller
             control={control}
-            name="email"
+            name="contact"
             render={({ field: { onChange, onBlur, value } }) => (
-              <View style={[ui.inputWrapper, errors.email ? styles.inputError : null]}>
-                <Mail color={palette.muted} size={20} />
+              <View style={[ui.inputWrapper, errors.contact ? styles.inputError : null]}>
+                {getAccountType(value) === "phone" ? (
+                  <Phone color={palette.muted} size={20} />
+                ) : (
+                  <Mail color={palette.muted} size={20} />
+                )}
                 <TextInput
                   value={value}
                   onChangeText={onChange}
                   onBlur={onBlur}
-                  placeholder={t("Nhập email", "Enter email")}
+                  placeholder={t("Nhập email hoặc số điện thoại", "Enter email or phone number")}
                   style={ui.input}
                   autoCapitalize="none"
-                  keyboardType="email-address"
+                  keyboardType="default"
                   placeholderTextColor={palette.muted}
                 />
               </View>
             )}
           />
-          {errors.email ? (
-            <Text style={styles.errorText}>{errors.email.message}</Text>
+          {errors.contact ? (
+            <Text style={styles.errorText}>{errors.contact.message}</Text>
           ) : null}
         </View>
 
@@ -233,11 +265,11 @@ export default function RegisterScreen({ navigation }: any) {
         <View style={styles.field}>
           <View style={styles.otpHeader}>
             <Text style={styles.label}>{t("Mã OTP", "OTP code")}</Text>
-            <Pressable onPress={sendOtp} disabled={sendingOtp || otpSent}>
+            <Pressable onPress={sendOtp} disabled={sendingOtp}>
               <View style={[styles.otpBtn, otpSent ? styles.otpSentBtn : null]}>
                 <Send color={otpSent ? "#22c55e" : palette.primary} size={14} style={styles.otpBtnIcon} />
                 <Text style={[styles.otpBtnText, otpSent ? styles.otpSentText : null]}>
-                  {sendingOtp ? t("Đang gửi...", "Sending...") : otpSent ? t("Đã gửi", "Sent") : t("Gửi OTP", "Send OTP")}
+                  {sendingOtp ? t("Đang gửi...", "Sending...") : otpSent ? t("Gửi lại OTP", "Resend OTP") : t("Gửi OTP", "Send OTP")}
                 </Text>
               </View>
             </Pressable>
@@ -251,7 +283,7 @@ export default function RegisterScreen({ navigation }: any) {
                   value={value}
                   onChangeText={onChange}
                   onBlur={onBlur}
-                  placeholder={t("Nhập mã OTP từ email", "Enter OTP from email")}
+                  placeholder={t("Nhập mã OTP", "Enter OTP")}
                   style={ui.input}
                   keyboardType="number-pad"
                   placeholderTextColor={palette.muted}
