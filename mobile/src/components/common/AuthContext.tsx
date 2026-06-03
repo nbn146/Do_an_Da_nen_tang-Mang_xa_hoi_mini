@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useMemo, useState, useEffect, useCallback } from "react";
 import type { ReactNode } from "react";
 import * as SecureStore from "expo-secure-store";
-import { api, setToken } from "../api/client";
-import { ENDPOINTS } from "../api/endpoints";
-import type { IUser, ApiResponse } from "../types/models";
+import { api, setToken } from "../../api/client";
+import { ENDPOINTS } from "../../api/endpoints";
+import type { IUser, ApiResponse } from "../../types/models";
 
 interface AuthContextType {
   user: IUser | null;
