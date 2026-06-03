@@ -26,6 +26,17 @@ const ALLOWED_IMAGE_MIMETYPES = [
   'image/webp',
 ];
 
+const ALLOWED_MESSAGE_FILE_MIMETYPES = [
+  ...ALLOWED_IMAGE_MIMETYPES,
+  'application/pdf',
+  'text/plain',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/zip',
+];
+
 // ==========================================
 // FILE FILTER - KIỂM TRA LOẠI FILE
 // ==========================================
@@ -48,6 +59,22 @@ const imageFileFilter: multer.Options['fileFilter'] = (
     cb(
       new Error(
         `Loại file không được hỗ trợ: ${file.mimetype}. Chỉ chấp nhận: ${ALLOWED_IMAGE_MIMETYPES.join(', ')}`
+      )
+    );
+  }
+};
+
+const messageFileFilter: multer.Options['fileFilter'] = (
+  _req: Request,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback
+) => {
+  if (ALLOWED_MESSAGE_FILE_MIMETYPES.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(
+      new Error(
+        `Loáº¡i file khÃ´ng Ä‘Æ°á»£c há»— trá»£: ${file.mimetype}.`
       )
     );
   }
@@ -98,11 +125,19 @@ export const uploadMultipleImages = multer(multerConfig).array('images', MAX_FIL
  * Middleware linh hoạt - có thể tùy chỉnh field name
  * Sử dụng khi cần upload với field name khác
  */
-export const createUploadMiddleware = (fieldName: string, maxCount: number = 1) => {
+export const createUploadMiddleware = (
+  fieldName: string,
+  maxCount: number = 1,
+  allowMessageFiles = false,
+) => {
+  const config = allowMessageFiles
+    ? { ...multerConfig, fileFilter: messageFileFilter }
+    : multerConfig;
+
   if (maxCount === 1) {
-    return multer(multerConfig).single(fieldName);
+    return multer(config).single(fieldName);
   }
-  return multer(multerConfig).array(fieldName, Math.min(maxCount, MAX_FILES));
+  return multer(config).array(fieldName, Math.min(maxCount, MAX_FILES));
 };
 
 // Export constants để sử dụng ở nơi khác nếu cần
@@ -111,4 +146,5 @@ export const UPLOAD_LIMITS = {
   MAX_FILES,
   MAX_FIELD_SIZE,
   ALLOWED_IMAGE_MIMETYPES,
+  ALLOWED_MESSAGE_FILE_MIMETYPES,
 };

@@ -7,8 +7,8 @@ import { getIo, getReceiverSocketId, getConnectedUsers } from "./state.js";
 // ─────────────────────────────────────────────
 
 /**
- * Khi user kết nối lại, đánh dấu `deliveredAt` cho những tin nhắn
- * đã gửi cho họ trong khi offline (deliveredAt = null).
+ * Khi user kết nối lại, đánh dấu `delivered_at` cho những tin nhắn
+ * đã gửi cho họ trong khi offline (`delivered_at = null`).
  * Sau đó thông báo sender rằng tin đã được deliver.
  */
 export async function flushPendingDeliveries(userId: string): Promise<void> {
@@ -16,29 +16,28 @@ export async function flushPendingDeliveries(userId: string): Promise<void> {
     const io = getIo();
     const connectedUsers = getConnectedUsers();
 
-    const result = await Message.updateMany(
+    const pendingMessages = await Message.find(
       {
-        receiver: new mongoose.Types.ObjectId(userId),
-        deliveredAt: null,
+        receiver_id: new mongoose.Types.ObjectId(userId),
+        delivered_at: null,
       },
-      { $set: { deliveredAt: new Date() } },
+      { conversation_id: 1, sender_id: 1, _id: 1 },
+    ).limit(50);
+
+    if (pendingMessages.length === 0) return;
+
+    const messageIds = pendingMessages.map((msg) => msg._id);
+
+    const result = await Message.updateMany(
+      { _id: { $in: messageIds } },
+      { $set: { delivered_at: new Date() } },
     );
 
     if (result.modifiedCount > 0) {
-      // Lấy danh sách tin vừa deliver để thông báo sender
-      const deliveredMessages = await Message.find(
-        {
-          receiver: new mongoose.Types.ObjectId(userId),
-          deliveredAt: { $exists: true, $ne: null },
-          readAt: null,
-        },
-        { conversationId: 1, sender: 1, _id: 1 },
-      ).limit(50);
-
       // Group theo sender để giảm số emit
       const bySender: Record<string, string[]> = {};
-      for (const msg of deliveredMessages) {
-        const senderId = msg.sender.toString();
+      for (const msg of pendingMessages) {
+        const senderId = msg.sender_id.toString();
         if (!bySender[senderId]) bySender[senderId] = [];
         bySender[senderId].push(msg._id.toString());
       }
@@ -47,8 +46,8 @@ export async function flushPendingDeliveries(userId: string): Promise<void> {
         const senderSocketId = connectedUsers[senderId];
         if (senderSocketId) {
           io.to(senderSocketId).emit("messagesDelivered", {
-            receiverId: userId,
-            messageIds,
+            receiver_id: userId,
+            message_ids: messageIds,
           });
         }
       }

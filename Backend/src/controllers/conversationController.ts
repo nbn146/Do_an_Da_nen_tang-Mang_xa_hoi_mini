@@ -22,34 +22,34 @@ export const getConversations = async (
     const userId = req.userId as string;
 
     const conversations = await Conversation.find({
-      participants: new mongoose.Types.ObjectId(userId),
+      participant_ids: new mongoose.Types.ObjectId(userId),
     })
-      .sort({ updatedAt: -1 })
-      .populate("participants", "_id username display_name avatar_url")
+      .sort({ updated_at: -1 })
+      .populate("participant_ids", "_id username display_name avatar_url")
       .populate({
-        path: "lastMessage",
+        path: "last_message_id",
         select:
-          "_id content messageType mediaUrl sender createdAt readAt deliveredAt",
+          "_id content message_type media_url sender_id created_at read_at delivered_at",
       });
 
     // Ẩn bản thân khỏi danh sách participants để FE dễ dùng
     const result = await Promise.all(conversations.map(async (conv: any) => {
-      const other = (conv.participants as any[]).find(
+      const other = (conv.participant_ids as any[]).find(
         (p) => p._id.toString() !== userId,
       );
       const unreadCount = await Message.countDocuments({
-        conversationId: conv._id,
-        receiverId: new mongoose.Types.ObjectId(userId),
-        readAt: null,
-        deletedBy: { $ne: new mongoose.Types.ObjectId(userId) },
+        conversation_id: conv._id,
+        receiver_id: new mongoose.Types.ObjectId(userId),
+        read_at: null,
+        deleted_by: { $ne: new mongoose.Types.ObjectId(userId) },
       });
 
       return {
         _id: conv._id,
         partner: other ?? null,
-        lastMessage: conv.lastMessage,
-        unreadCount,
-        updatedAt: conv.updatedAt,
+        last_message: conv.last_message_id,
+        unread_count: unreadCount,
+        updated_at: conv.updated_at,
       };
     }));
 
@@ -106,22 +106,22 @@ export const createConversation = async (
 
     // Tìm conversation đã tồn tại giữa 2 người
     let conversation = await Conversation.findOne({
-      participants: { $all: [senderOId, receiverOId], $size: 2 },
+      participant_ids: { $all: [senderOId, receiverOId], $size: 2 },
     })
-      .populate("participants", "_id username display_name avatar_url")
-      .populate("lastMessage");
+      .populate("participant_ids", "_id username display_name avatar_url")
+      .populate("last_message_id");
 
     if (!conversation) {
       conversation = await Conversation.create({
-        participants: [senderOId, receiverOId],
-        unreadCount: {
+        participant_ids: [senderOId, receiverOId],
+        unread_count: {
           [senderId]: 0,
           [receiverId]: 0,
         },
       });
 
       conversation = await conversation.populate(
-        "participants",
+        "participant_ids",
         "_id username display_name avatar_url",
       );
     }
@@ -168,7 +168,7 @@ export const getMessages = async (
     // Kiểm tra user có trong conversation không
     const conversation = await Conversation.findOne({
       _id: conversationId,
-      participants: new mongoose.Types.ObjectId(userId),
+      participant_ids: new mongoose.Types.ObjectId(userId),
     });
 
     if (!conversation) {
@@ -183,18 +183,18 @@ export const getMessages = async (
     }
 
     const total = await Message.countDocuments({
-      conversationId,
-      deletedBy: { $ne: new mongoose.Types.ObjectId(userId) }, // Lọc tin đã xoá phía mình
+      conversation_id: conversationId,
+      deleted_by: { $ne: new mongoose.Types.ObjectId(userId) }, // Lọc tin đã xoá phía mình
     });
 
     const messages = await Message.find({
-      conversationId,
-      deletedBy: { $ne: new mongoose.Types.ObjectId(userId) },
+      conversation_id: conversationId,
+      deleted_by: { $ne: new mongoose.Types.ObjectId(userId) },
     })
-      .sort({ createdAt: -1 }) // Mới nhất lên đầu để phân trang dễ
+      .sort({ created_at: -1 }) // Mới nhất lên đầu để phân trang dễ
       .skip((page - 1) * limit)
       .limit(limit)
-      .populate("senderId", "_id username display_name avatar_url");
+      .populate("sender_id", "_id username display_name avatar_url");
 
     successResponse(
       req,
@@ -234,7 +234,9 @@ export const sendMessage = async (
     const senderId = req.userId as string;
     const { conversationId } = req.params as { conversationId: string };
     const uploadedFile = (req as any).file as Express.Multer.File | undefined;
-    let { content = "", messageType = "text", mediaUrl } = req.body;
+    let content = req.body.content ?? "";
+    let messageType = req.body.message_type ?? req.body.messageType ?? "text";
+    let mediaUrl = req.body.media_url ?? req.body.mediaUrl;
 
     if (!mongoose.Types.ObjectId.isValid(conversationId)) {
       errorResponse(
@@ -286,7 +288,7 @@ export const sendMessage = async (
     // Tìm conversation và xác nhận sender là thành viên
     const conversation = await Conversation.findOne({
       _id: conversationId,
-      participants: new mongoose.Types.ObjectId(senderId),
+      participant_ids: new mongoose.Types.ObjectId(senderId),
     });
 
     if (!conversation) {
@@ -301,7 +303,7 @@ export const sendMessage = async (
     }
 
     // Xác định receiver (người còn lại trong conversation)
-    const receiverId = conversation.participants
+    const receiverId = conversation.participant_ids
       .find((p) => p.toString() !== senderId)
       ?.toString();
 
@@ -318,16 +320,16 @@ export const sendMessage = async (
 
     // Tạo tin nhắn mới
     const messageData: Record<string, unknown> = {
-      conversationId,
-      senderId: new mongoose.Types.ObjectId(senderId),
-      receiverId: new mongoose.Types.ObjectId(receiverId),
-      messageType,
+      conversation_id: new mongoose.Types.ObjectId(conversationId),
+      sender_id: new mongoose.Types.ObjectId(senderId),
+      receiver_id: new mongoose.Types.ObjectId(receiverId),
+      message_type: messageType,
       content: content?.trim() ?? "",
-      deliveredAt: null,
-      readAt: null,
+      delivered_at: null,
+      read_at: null,
     };
     if (mediaUrl) {
-      messageData.mediaUrl = mediaUrl;
+      messageData.media_url = mediaUrl;
     }
 
     const newMessage = await Message.create(messageData);
@@ -335,13 +337,13 @@ export const sendMessage = async (
 
     // Cập nhật lastMessage + tăng unreadCount cho receiver
     await Conversation.findByIdAndUpdate(conversationId, {
-      lastMessage: newMessage._id,
-      $inc: { [`unreadCount.${receiverId}`]: 1 },
-      updatedAt: new Date(),
+      last_message_id: newMessage._id,
+      $inc: { [`unread_count.${receiverId}`]: 1 },
+      updated_at: new Date(),
     });
 
     const populated = await newMessage.populate(
-      "senderId",
+      "sender_id",
       "_id username display_name avatar_url",
     );
 
@@ -349,13 +351,13 @@ export const sendMessage = async (
     const receiverSocketId = getReceiverSocketId(receiverId);
     if (receiverSocketId) {
       getIo().to(receiverSocketId).emit("newMessage", {
-        conversationId,
+        conversation_id: conversationId,
         message: populated,
       });
 
       // Đánh dấu delivered ngay khi biết receiver đang online
       await Message.findByIdAndUpdate(newMessage._id, {
-        deliveredAt: new Date(),
+        delivered_at: new Date(),
       });
     }
 
@@ -397,7 +399,26 @@ export const deleteMessage = async (
       return;
     }
 
-    const message = await Message.findOne({ _id: messageId, conversationId });
+    const conversation = await Conversation.findOne({
+      _id: conversationId,
+      participant_ids: new mongoose.Types.ObjectId(userId),
+    });
+
+    if (!conversation) {
+      errorResponse(
+        req,
+        res,
+        "chat.CONVERSATION_NOT_FOUND",
+        404,
+        "CONVERSATION_NOT_FOUND",
+      );
+      return;
+    }
+
+    const message = await Message.findOne({
+      _id: messageId,
+      conversation_id: conversationId,
+    });
 
     if (!message) {
       errorResponse(
@@ -413,29 +434,28 @@ export const deleteMessage = async (
     // Chỉ sender mới được xoá cứng (xoá hoàn toàn); người nhận chỉ xoá phía mình
     const userOId = new mongoose.Types.ObjectId(userId);
 
-    if (message.deletedBy?.toString() === userId) {
+    if (message.deleted_by?.toString() === userId) {
       errorResponse(req, res, "chat.ALREADY_DELETED", 400, "ALREADY_DELETED");
       return;
     }
 
-    await Message.findByIdAndUpdate(messageId, { deletedBy: userOId });
+    await Message.findByIdAndUpdate(messageId, { deleted_by: userOId });
 
     // Nếu đây là tin nhắn cuối cùng → cập nhật lại lastMessage cho conversation
-    const conversation = await Conversation.findById(conversationId);
-    if (conversation?.lastMessage?.toString() === messageId) {
+    if (conversation.last_message_id?.toString() === messageId) {
       const prevMessage = await Message.findOne({
-        conversationId,
+        conversation_id: conversationId,
         _id: { $ne: messageId },
-        deletedBy: { $ne: userOId },
-      }).sort({ createdAt: -1 });
+        deleted_by: { $ne: userOId },
+      }).sort({ created_at: -1 });
 
       await Conversation.findByIdAndUpdate(conversationId, {
-        lastMessage: prevMessage?._id ?? null,
+        last_message_id: prevMessage?._id ?? null,
       });
     }
 
     // Thông báo realtime cho đối phương (nếu cần ẩn tin nhắn ở phía họ)
-    const receiverId = conversation?.participants
+    const receiverId = conversation.participant_ids
       .find((p) => p.toString() !== userId)
       ?.toString();
 
@@ -444,14 +464,17 @@ export const deleteMessage = async (
       if (receiverSocketId) {
         getIo()
           .to(receiverSocketId)
-          .emit("messageDeleted", { conversationId, messageId });
+          .emit("messageDeleted", {
+            conversation_id: conversationId,
+            message_id: messageId,
+          });
       }
     }
 
     successResponse(
       req,
       res,
-      { messageId },
+      { message_id: messageId },
       "chat.DELETE_SUCCESS",
       200,
       "DELETE_SUCCESS",
@@ -487,7 +510,7 @@ export const markAsRead = async (
 
     const conversation = await Conversation.findOne({
       _id: conversationId,
-      participants: new mongoose.Types.ObjectId(userId),
+      participant_ids: new mongoose.Types.ObjectId(userId),
     });
 
     if (!conversation) {
@@ -506,20 +529,20 @@ export const markAsRead = async (
     // Cập nhật readAt cho tất cả tin nhắn chưa đọc của mình (receiver = userId)
     await Message.updateMany(
       {
-        conversationId,
-        receiverId: new mongoose.Types.ObjectId(userId),
-        readAt: null,
+        conversation_id: conversationId,
+        receiver_id: new mongoose.Types.ObjectId(userId),
+        read_at: null,
       },
-      { $set: { readAt: now } },
+      { $set: { read_at: now } },
     );
 
     // Reset unreadCount về 0 cho userId
     await Conversation.findByIdAndUpdate(conversationId, {
-      $set: { [`unreadCount.${userId}`]: 0 },
+      $set: { [`unread_count.${userId}`]: 0 },
     });
 
     // Thông báo realtime cho sender biết tin đã được đọc
-    const partnerId = conversation.participants
+    const partnerId = conversation.participant_ids
       .find((p) => p.toString() !== userId)
       ?.toString();
 
@@ -527,9 +550,9 @@ export const markAsRead = async (
       const partnerSocketId = getReceiverSocketId(partnerId);
       if (partnerSocketId) {
         getIo().to(partnerSocketId).emit("messagesRead", {
-          conversationId,
-          readBy: userId,
-          readAt: now,
+          conversation_id: conversationId,
+          read_by: userId,
+          read_at: now,
         });
       }
     }
@@ -537,7 +560,7 @@ export const markAsRead = async (
     successResponse(
       req,
       res,
-      { conversationId },
+      { conversation_id: conversationId },
       "chat.MARK_READ_SUCCESS",
       200,
       "MARK_READ_SUCCESS",

@@ -90,6 +90,16 @@ export function useNotifications() {
     }
   }, []);
 
+  // Xóa 1 notification
+  const deleteNotification = useCallback(async (notificationId: string) => {
+    try {
+      await apiClient.delete(`/notifications/${notificationId}`);
+      setNotifications((prev) => prev.filter((n) => n._id !== notificationId));
+    } catch (err) {
+      console.error("Lỗi xóa thông báo:", err);
+    }
+  }, []);
+
   // Đếm số notification chưa đọc
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
@@ -100,6 +110,7 @@ export function useNotifications() {
     unreadCount,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
     refetch: fetchNotifications,
   };
 }

@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
   Pressable,
   RefreshControl,
   StyleSheet,
+  Alert,
 } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import {
@@ -15,10 +15,14 @@ import {
   Share2,
   CheckCheck,
   Clock,
+  X,
 } from "lucide-react-native";
 import { Image } from "expo-image";
+import { io } from "socket.io-client";
+import type { Socket } from "socket.io-client";
 import { api } from "../api/client";
 import { ENDPOINTS } from "../api/endpoint";
+import { BASE_URL } from "../api/config";
 import { palette } from "../theme";
 import { ScreenGradient } from "../components/common/ScreenGradient";
 import { useLanguage } from "../store/LanguageContext";
@@ -86,6 +90,31 @@ export default function NotificationsScreen() {
     load();
   }, [load]);
 
+  // Lắng nghe thông báo mới realtime qua Socket.IO
+  useEffect(() => {
+    const authHeader = (api.defaults.headers.common as any)?.Authorization;
+    const token =
+      typeof authHeader === "string"
+        ? authHeader.replace("Bearer ", "")
+        : null;
+
+    if (!token) return;
+
+    const socket: Socket = io(BASE_URL, {
+      auth: { token },
+      transports: ["websocket"],
+      reconnection: true,
+    });
+
+    socket.on("notification:new", (notification: INotification) => {
+      setNotifications((prev) => [notification, ...prev]);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
+
   const markAsRead = useCallback(async (id: string) => {
     try {
       await api.patch(ENDPOINTS.NOTIFICATION_READ(id));
@@ -103,6 +132,15 @@ export default function NotificationsScreen() {
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     } catch (e) {
       console.error("[NotificationsScreen] Mark all read error:", e);
+    }
+  }, []);
+
+  const deleteNotification = useCallback(async (id: string) => {
+    try {
+      await api.delete(ENDPOINTS.NOTIFICATION_DELETE(id));
+      setNotifications((prev) => prev.filter((n) => n._id !== id));
+    } catch (e) {
+      console.error("[NotificationsScreen] Delete error:", e);
     }
   }, []);
 
@@ -143,6 +181,13 @@ export default function NotificationsScreen() {
             </View>
           </View>
           {!item.is_read ? <View style={styles.unreadDot} /> : null}
+          <Pressable
+            onPress={() => deleteNotification(item._id)}
+            hitSlop={8}
+            style={styles.deleteBtn}
+          >
+            <X color={palette.muted} size={14} />
+          </Pressable>
         </Pressable>
       );
     },

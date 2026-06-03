@@ -1,4 +1,4 @@
-import { Heart, MessageCircle, UserPlus, AtSign, Share2, Clock, Check, CheckCheck, Loader2 } from "lucide-react";
+import { Heart, MessageCircle, UserPlus, AtSign, Share2, Clock, Check, CheckCheck, Loader2, Trash2 } from "lucide-react";
 import { useNotifications, type INotification } from "../../hooks/useNotifications";
 import { useLangText } from "../../hooks/useLangText";
 
@@ -54,7 +54,7 @@ function timeAgo(dateStr: string, text: (vi: string, en: string) => string): str
 
 export function NotificationsView() {
   const text = useLangText();
-  const { notifications, isLoading, error, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, isLoading, error, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
 
   if (isLoading) {
     return (
@@ -142,7 +142,7 @@ export function NotificationsView() {
                       }
                     }
                   }}
-                  className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer ${
+                  className={`group p-4 hover:bg-gray-50 transition-colors cursor-pointer ${
                     !notification.is_read ? "bg-purple-50/50" : ""
                   }`}
                 >
@@ -185,6 +185,18 @@ export function NotificationsView() {
                     ) : (
                       <Check className="w-4 h-4 text-gray-300 flex-shrink-0 mt-2" />
                     )}
+
+                    {/* Nút xóa thông báo */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteNotification(notification._id);
+                      }}
+                      className="p-1 hover:bg-red-50 rounded-full flex-shrink-0 ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title={text("Xóa thông báo", "Delete notification")}
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-gray-400 hover:text-red-500" />
+                    </button>
                   </div>
                 </div>
               );

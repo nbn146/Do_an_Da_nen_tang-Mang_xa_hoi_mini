@@ -78,34 +78,52 @@ export default function MessagesScreen({ route }: any) {
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    // 1. Kết nối với máy chủ Socket
-    socketRef.current = io(BASE_URL);
+    // Lấy token JWT từ API client headers để xác thực socket
+    const authHeader = (api.defaults.headers.common as any)?.Authorization;
+    const token =
+      typeof authHeader === "string"
+        ? authHeader.replace("Bearer ", "")
+        : null;
 
-    // 2. Tham gia vào phòng chat hiện tại (Tùy Backend cấu hình)
+    if (!token) return;
+
+    // 1. Kết nối Socket.IO với xác thực JWT
+    const socket = io(BASE_URL, {
+      auth: { token },
+      transports: ["websocket"],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
+    socketRef.current = socket;
+
+    // 2. Tham gia phòng chat hiện tại (đúng event name backend)
     if (selectedConvId) {
-      socketRef.current.emit("join_room", selectedConvId);
+      socket.emit("joinConversation", { conversationId: selectedConvId });
     }
 
-    // 3. Lắng nghe Backend "bắn" tin nhắn mới về
-    socketRef.current.on("receive_message", (newMsg) => {
-      // Nếu tin nhắn mới thuộc về phòng chat đang mở thì nhét nó vào mảng hiển thị
-      if (
-        newMsg.conversationId === selectedConvId ||
-        newMsg.conversation === selectedConvId
-      ) {
-        setMessages((prev) => {
-          // Kiểm tra trùng lặp để tránh hiện 2 tin giống nhau
-          const isExist = prev.some((msg) => msg._id === newMsg._id);
-          return isExist ? prev : [...prev, newMsg];
+    // 3. Lắng nghe tin nhắn mới từ backend (event: newMessage)
+    socket.on("newMessage", (payload: any) => {
+      const msg = payload.message || payload;
+      const convId = payload.conversationId || msg.conversationId;
+      if (convId === selectedConvId) {
+        setMessages((prev: any[]) => {
+          const isExist = prev.some((m: any) => m._id === msg._id);
+          return isExist ? prev : [...prev, msg];
         });
       }
+      // Cập nhật danh sách conversations khi có tin nhắn mới
+      loadConversations();
     });
 
     // 4. Dọn dẹp khi thoát phòng chat
     return () => {
-      socketRef.current?.disconnect();
+      if (selectedConvId) {
+        socket.emit("leaveConversation", { conversationId: selectedConvId });
+      }
+      socket.disconnect();
     };
-  }, [selectedConvId]);
+  }, [selectedConvId, loadConversations]);
 
   const loadConversations = useCallback(async () => {
     try {
@@ -143,36 +161,7 @@ export default function MessagesScreen({ route }: any) {
       console.error(e);
     }
   }, []);
-  useEffect(() => {
-    let intervalId: any;
 
-    // Nếu đang mở một phòng chat cụ thể
-    if (selectedConvId) {
-      // Thiết lập hẹn giờ: Cứ đúng 2.5 giây là âm thầm gọi hàm loadMessages 1 lần
-      intervalId = setInterval(() => {
-        loadMessages(selectedConvId);
-      }, 2500); // 2500 mili-giây = 2.5 giây
-    }
-
-    // Dọn dẹp bộ đếm giờ khi bạn bấm nút Back thoát ra ngoài (Cực kỳ quan trọng để không lag máy)
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [selectedConvId, loadMessages]);
-  // ⚡️ THÊM ĐOẠN NÀY VÀO ĐỂ LÀM MỚI TIN NHẮN LIÊN TỤC
-  useEffect(() => {
-    if (!selectedConvId) return;
-
-    // Cứ 3 giây (3000ms) sẽ âm thầm gọi API lấy tin nhắn mới 1 lần
-    const interval = setInterval(() => {
-      loadMessages(selectedConvId);
-    }, 3000);
-
-    // Bắt buộc phải có dòng này để xóa bộ đếm khi thoát phòng chat (tránh tràn RAM)
-    return () => clearInterval(interval);
-  }, [selectedConvId, loadMessages]);
 
   const markConversationRead = useCallback(async (convId: string) => {
     setConversations((prev) =>

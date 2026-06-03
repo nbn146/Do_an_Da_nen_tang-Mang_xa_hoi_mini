@@ -60,9 +60,6 @@ app.use("/api/users", userRoutes);
 app.use("/api/search", searchRoutes);
 
 
-// Kéo xuống chỗ app.use() và thêm dòng này vào:
-app.use("/api/users", userRoutes);
-
 app.get("/api/test", (req: Request, res: Response) => {
   res.status(200).json({ message: "MiniSocial API đang chạy mượt mà! 🚀" });
 });

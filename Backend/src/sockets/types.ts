@@ -11,13 +11,16 @@ export interface ConnectedUsers {
 
 /** Payload FE gửi khi typing / stopTyping */
 export interface TypingPayload {
-  conversationId: string;
-  receiverId: string;
+  conversation_id?: string;
+  receiver_id?: string;
+  conversationId?: string;
+  receiverId?: string;
 }
 
 /** Payload FE gửi khi join / leave conversation */
 export interface ConversationPayload {
-  conversationId: string;
+  conversation_id?: string;
+  conversationId?: string;
 }
 
 /** Socket đã qua auth middleware sẽ có data.userId */

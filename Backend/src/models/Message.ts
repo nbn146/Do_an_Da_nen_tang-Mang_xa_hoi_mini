@@ -1,40 +1,40 @@
 import mongoose, { Schema, type Document } from "mongoose";
 
 export interface IMessage extends Document {
-  conversationId: mongoose.Types.ObjectId;
-  sender: mongoose.Types.ObjectId;
-  receiver: mongoose.Types.ObjectId;
-  messageType: string;
+  conversation_id: mongoose.Types.ObjectId;
+  sender_id: mongoose.Types.ObjectId;
+  receiver_id: mongoose.Types.ObjectId;
+  message_type: string;
   content: string;
-  mediaUrl?: string;
-  deletedBy?: mongoose.Types.ObjectId;
-  deliveredAt: Date | null;
-  readAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
+  media_url?: string;
+  deleted_by?: mongoose.Types.ObjectId;
+  delivered_at: Date | null;
+  read_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
 }
 
 const messageSchema = new Schema<IMessage>(
   {
-    conversationId: {
+    conversation_id: {
       type: Schema.Types.ObjectId,
       ref: "Conversation",
       required: true,
       index: true,
     },
-    sender: {
+    sender_id: {
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
       index: true,
     },
-    receiver: {
+    receiver_id: {
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
       index: true,
     },
-    messageType: {
+    message_type: {
       type: String,
       enum: ["text", "image", "file"],
       default: "text",
@@ -45,29 +45,29 @@ const messageSchema = new Schema<IMessage>(
       maxlength: 2000,
       default: "",
     },
-    mediaUrl: {
+    media_url: {
       type: String,
     },
-    deletedBy: {
+    deleted_by: {
       type: Schema.Types.ObjectId,
       ref: "User",
     },
-    deliveredAt: {
+    delivered_at: {
       type: Date,
       default: null,
     },
-    readAt: {
+    read_at: {
       type: Date,
       default: null,
     },
   },
   {
-    timestamps: true,
+    timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
   },
 );
 
-messageSchema.index({ conversationId: 1, createdAt: -1 });
-messageSchema.index({ sender: 1, receiver: 1, createdAt: -1 });
+messageSchema.index({ conversation_id: 1, created_at: -1 });
+messageSchema.index({ sender_id: 1, receiver_id: 1, created_at: -1 });
 
 const Message = mongoose.model<IMessage>("Message", messageSchema);
 

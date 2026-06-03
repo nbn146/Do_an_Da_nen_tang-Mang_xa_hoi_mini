@@ -11,7 +11,7 @@ import { verifyToken as authenticate } from "../middleware/authMiddleware.js";
 import { createUploadMiddleware } from "../middleware/uploadMiddleware.js";
 
 // Middleware cho upload file trong tin nhắn (1 file, max 5MB)
-const uploadMessageFile = createUploadMiddleware('file', 1);
+const uploadMessageFile = createUploadMiddleware('file', 1, true);
 
 const router = Router();
 
@@ -38,12 +38,12 @@ router.get("/:conversationId/messages", getMessages);
 
 // Gửi tin nhắn text
 // POST /api/conversations/:conversationId/messages
-// Body: { content: string, messageType: "text" }
+// Body: { content: string, message_type: "text" }
 router.post("/:conversationId/messages", sendMessage);
 
 // Gửi tin nhắn có file/ảnh (upload với giới hạn 5MB)
 // POST /api/conversations/:conversationId/messages/upload
-// Form-data: file (field name: "file"), messageType: "image" | "file"
+// Form-data: file (field name: "file"), message_type: "image" | "file"
 router.post(
   "/:conversationId/messages/upload",
   uploadMessageFile,

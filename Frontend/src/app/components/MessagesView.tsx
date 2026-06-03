@@ -370,9 +370,9 @@ export function MessagesView({
                 ) : (
                   messages.map((message) => {
                     const senderId =
-                      typeof message.senderId === "string"
-                        ? message.senderId
-                        : message.senderId._id;
+                      typeof message.sender === "string"
+                        ? message.sender
+                        : message.sender._id;
                     const isOwn = senderId === currentUser?._id;
 
                     return (

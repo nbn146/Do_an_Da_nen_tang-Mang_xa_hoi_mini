@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 import { io } from "socket.io-client";
 import type { Socket } from "socket.io-client";
 import { BASE_URL } from "../api/config";
+import { api } from "../api/client";
 import { useAuth } from "./AuthContext";
 
 interface SocketContextType {
@@ -37,13 +38,25 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Lấy token JWT từ API client headers
+    const authHeader = (api.defaults.headers.common as any)?.Authorization;
+    const token =
+      typeof authHeader === "string"
+        ? authHeader.replace("Bearer ", "")
+        : null;
+
+    if (!token) return;
+
     const socket = io(BASE_URL, {
       transports: ["websocket"],
       autoConnect: true,
+      auth: { token },
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     });
 
     socket.on("connect", () => {
-      socket.emit("register-user", (user as any)._id);
       setIsConnected(true);
     });
 
